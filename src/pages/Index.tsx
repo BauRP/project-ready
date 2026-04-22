@@ -16,7 +16,7 @@ import { startPresence } from "@/lib/presence";
 import { performStartupHandshake, listenForFriendRequests, acceptFriendRequest } from "@/lib/firebase-sync";
 import { initMockPeer } from "@/lib/mock-peer";
 import { isDuplicateMessage } from "@/lib/gun-setup";
-import { AD_CONFIG, getAppTopOffset, getBottomNavOffset } from "@/lib/ad-config";
+import { AD_CONFIG, BANNER_HEIGHT, getAppTopOffset, getBottomNavOffset } from "@/lib/ad-config";
 import { toast } from "sonner";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 
@@ -177,7 +177,8 @@ const Index = () => {
   const showAd = isOnline && !stealthMode;
   const rootStyle = {
     backgroundImage: "var(--gradient-bg)",
-    paddingTop: getAppTopOffset(),
+    paddingTop: `${BANNER_HEIGHT}px`,
+    height: "100dvh",
     ["--bottom-nav-offset" as string]: getBottomNavOffset(),
     ["--bottom-nav-height" as string]: `${AD_CONFIG.BOTTOM_NAV_HEIGHT}px`,
     ["--app-top-offset" as string]: getAppTopOffset(),
@@ -185,7 +186,7 @@ const Index = () => {
 
   if (openChat) {
     return (
-      <div className="h-screen max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
+      <div className="max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
         {biometricOverlay}
         {showAd && <AdMobBanner stealthMode={stealthMode} />}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -201,7 +202,7 @@ const Index = () => {
   }
 
   return (
-    <div className="h-screen max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
+    <div className="max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
       {biometricOverlay}
       {showAd && <AdMobBanner stealthMode={stealthMode} />}
       <div
