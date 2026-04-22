@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "746221864556",
+    "project_id": "trivo-chat-servers",
+    "storage_bucket": "trivo-chat-servers.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:746221864556:android:f84b2f3c8e867184727a49",
+        "android_client_info": {
+          "package_name": "com.baurp.trivochat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDme-KT_zEjqlpYCpq2FfK3yiYJrpAQq9I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
