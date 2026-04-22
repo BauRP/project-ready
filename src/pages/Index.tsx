@@ -180,6 +180,7 @@ const Index = () => {
     paddingTop: getAppTopOffset(),
     ["--bottom-nav-offset" as string]: getBottomNavOffset(),
     ["--bottom-nav-height" as string]: `${AD_CONFIG.BOTTOM_NAV_HEIGHT}px`,
+    ["--app-top-offset" as string]: getAppTopOffset(),
   } as React.CSSProperties;
 
   if (openChat) {
