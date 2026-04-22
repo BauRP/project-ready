@@ -1,0 +1,64 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    apply from: "variables.gradle"
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://repo.yandex.ru/repository/yandex-mobile/' }
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+        classpath 'com.google.gms:google-services:4.4.4'
+        // Теперь версия берется из variables.gradle (kotlin_version = '2.1.0')
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://repo.yandex.ru/repository/yandex-mobile/' }
+    }
+    
+    // ВАШ ЗАМОК (Оптимизирован и перенесен в корень для безопасности)
+    configurations.all {
+        resolutionStrategy {
+            force 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+            force 'org.bouncycastle:bcpkix-jdk18on:1.78.1'
+            
+            dependencySubstitution {
+                substitute module('org.bouncycastle:bcprov-jdk18on:1.79') using module('org.bouncycastle:bcprov-jdk18on:1.78.1')
+                substitute module('org.bouncycastle:bcpkix-jdk18on:1.79') using module('org.bouncycastle:bcpkix-jdk18on:1.78.1')
+                substitute module('org.bouncycastle:bcprov-jdk15on') using module('org.bouncycastle:bcprov-jdk18on:1.78.1')
+                substitute module('org.bouncycastle:bcpkix-jdk15on') using module('org.bouncycastle:bcpkix-jdk18on:1.78.1')
+            }
+        }
+    }
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            android {
+                // Принудительно ставим Java 21 для всех модулей
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_21
+                    targetCompatibility JavaVersion.VERSION_21
+                }
+                
+                // Принудительно ставим цель для Kotlin
+                if (project.plugins.hasPlugin('kotlin-android')) {
+                    kotlinOptions {
+                        jvmTarget = "21"
+                    }
+                }
+            }
+        }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
