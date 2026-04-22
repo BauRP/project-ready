@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { YandexAds } from "@/lib/yandex-ads";
-import { AD_CONFIG } from "@/lib/ad-config";
+import { AD_CONFIG, BANNER_HEIGHT } from "@/lib/ad-config";
 
 interface AdMobBannerProps {
   stealthMode?: boolean;
@@ -79,7 +79,7 @@ const AdMobBanner = ({ stealthMode = false }: AdMobBannerProps) => {
 
     if (!Capacitor.isNativePlatform()) {
       setAdState("yandex-loaded");
-      adjustLayout(AD_CONFIG.BANNER_HEIGHT);
+      adjustLayout(BANNER_HEIGHT);
       return;
     }
 
@@ -88,7 +88,7 @@ const AdMobBanner = ({ stealthMode = false }: AdMobBannerProps) => {
       const result = await YandexAds.showBanner({
         adUnitId: YANDEX_UNIT_ID,
         position: "top",
-        size: "50", // Передаем 50, чтобы плагин знал о высоте
+        size: String(BANNER_HEIGHT),
       });
 
       if (!result?.success) {
@@ -97,7 +97,7 @@ const AdMobBanner = ({ stealthMode = false }: AdMobBannerProps) => {
         scheduleRetry();
       } else {
         setAdState("yandex-loaded");
-        adjustLayout(AD_CONFIG.BANNER_HEIGHT);
+        adjustLayout(BANNER_HEIGHT);
       }
     } catch {
       setAdState("hidden");
@@ -114,7 +114,7 @@ const AdMobBanner = ({ stealthMode = false }: AdMobBannerProps) => {
 
     if (!Capacitor.isNativePlatform()) {
       setAdState("google-loaded");
-      adjustLayout(AD_CONFIG.BANNER_HEIGHT);
+      adjustLayout(BANNER_HEIGHT);
       return;
     }
 
@@ -138,14 +138,14 @@ const AdMobBanner = ({ stealthMode = false }: AdMobBannerProps) => {
         () => {
           if (!mountedRef.current) return;
           setAdState("google-loaded");
-          adjustLayout(AD_CONFIG.BANNER_HEIGHT);
+          adjustLayout(BANNER_HEIGHT);
         }
       );
       const sizeListener = await AdMob.addListener(
         BannerAdPluginEvents.SizeChanged,
-        (info: { width: number; height: number }) => {
+        () => {
           if (!mountedRef.current) return;
-          adjustLayout(info?.height && info.height > 0 ? info.height : AD_CONFIG.BANNER_HEIGHT);
+          adjustLayout(BANNER_HEIGHT);
         }
       );
       listenersRef.current.push(failListener, loadListener, sizeListener);
@@ -191,13 +191,16 @@ const AdMobBanner = ({ stealthMode = false }: AdMobBannerProps) => {
     <div
       className="fixed top-0 left-0 w-screen z-[9999] m-0 p-0 ad-banner-container shrink-0 bg-background flex items-center justify-center"
       style={{
-        top: Capacitor.isNativePlatform() ? `calc(var(--safe-top, 0px) + ${AD_CONFIG.TOP_OFFSET}px)` : AD_CONFIG.TOP_OFFSET,
+        top: AD_CONFIG.TOP_OFFSET,
         right: 0,
         width: AD_CONFIG.FULL_WIDTH ? "100vw" : undefined,
         maxWidth: AD_CONFIG.FULL_WIDTH ? "100vw" : undefined,
-        height: `${AD_CONFIG.BANNER_HEIGHT}px`,
+        height: `${BANNER_HEIGHT}px`,
         zIndex: AD_CONFIG.Z_INDEX,
         boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
     >
       {!Capacitor.isNativePlatform() && (

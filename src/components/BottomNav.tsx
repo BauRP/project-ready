@@ -24,20 +24,21 @@ const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
 
   return (
     <nav 
-      className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto"
+      className="!fixed !bottom-0 left-0 right-0 z-[100] max-w-md mx-auto"
       style={{
+        position: "fixed",
         bottom: 0,
         left: 0,
         right: 0,
-        zIndex: 50,
+        zIndex: 100,
       }}
     >
       <div
         className="glass-panel px-2 rounded-none rounded-t-2xl neon-border border-b-0"
         style={{
-          minHeight: AD_CONFIG.BOTTOM_NAV_HEIGHT,
+          height: AD_CONFIG.BOTTOM_NAV_HEIGHT,
           paddingTop: 4,
-          paddingBottom: "calc(4px + env(safe-area-inset-bottom, 0px))",
+          paddingBottom: 4,
         }}
       >
         <div className="flex items-center justify-around">
