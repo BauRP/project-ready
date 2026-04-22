@@ -29,7 +29,7 @@ const Index = () => {
   const [openChat, setOpenChat] = useState<{ id: string; name: string; emoji: string } | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [biometricLocked, setBiometricLocked] = useState(false);
-  const { fingerprint, stealthMode } = useIdentity();
+  const { userId, stealthMode } = useIdentity();
   const { language } = useLanguage();
   const { isEnabled: biometricEnabled, authenticate } = useBiometricAuth();
   const backgroundTimestamp = useRef<number>(0);
@@ -70,9 +70,9 @@ const Index = () => {
   }, [biometricLocked, handleUnlock]);
 
   useEffect(() => {
-    if (!fingerprint) return;
-    initPeer(fingerprint).catch(() => {});
-    const stopPresence = startPresence(fingerprint);
+    if (!userId) return;
+    initPeer(userId).catch(() => {});
+    const stopPresence = startPresence(userId);
 
     // Initialize mock peer on first launch
     initMockPeer(language).then((created) => {
@@ -82,14 +82,14 @@ const Index = () => {
     }).catch(() => {});
 
     // Startup handshake
-    performStartupHandshake(fingerprint).then((buffered) => {
+    performStartupHandshake(userId).then((buffered) => {
       if (buffered.length > 0) {
         toast.info(`${buffered.length} missed message${buffered.length > 1 ? "s" : ""} synced`);
       }
     }).catch(() => {});
 
     // Listen for incoming friend requests
-    const unsubFriendReq = listenForFriendRequests(fingerprint, async (req) => {
+    const unsubFriendReq = listenForFriendRequests(userId, async (req) => {
       const existing = await getChatMeta(req.from);
       if (!existing) {
         await saveChatMeta({
@@ -100,7 +100,7 @@ const Index = () => {
           unread: 0,
           started: false,
         });
-        await acceptFriendRequest(req.from, fingerprint);
+        await acceptFriendRequest(req.from, userId);
         toast.info(`${req.fromName || "Someone"} added you as a friend`);
       }
     });
@@ -133,7 +133,7 @@ const Index = () => {
       unsubFriendReq();
       stopPresence();
     };
-  }, [fingerprint, language]);
+  }, [userId, language]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);

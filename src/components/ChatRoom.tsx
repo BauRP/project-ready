@@ -25,6 +25,7 @@ import {
 import { bufferMessageInCloud, updateMessageStatus, listenForStatusUpdates } from "@/lib/firebase-sync";
 import AudioWaveformPlayer from "./AudioWaveformPlayer";
 import SecurityScanOverlay from "./SecurityScanOverlay";
+import MessageInput from "./MessageInput";
 
 interface Message {
   id: string;
@@ -60,7 +61,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { fingerprint } = useIdentity();
+  const { userId } = useIdentity();
 
   // Presence subscription
   useEffect(() => {
@@ -80,7 +81,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         stored.map((m) => ({
           id: m.id,
           text: m.text,
-          sent: m.from === fingerprint,
+          sent: m.from === userId,
           time: new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           status: m.status as any || "sent",
           media: (m as any).media,
@@ -88,7 +89,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       );
       
       for (const m of stored) {
-        if (m.from !== fingerprint && m.status !== "read") {
+        if (m.from !== userId && m.status !== "read") {
           updateMessageStatus(m.from, m.id, "read");
         }
       }
@@ -99,14 +100,14 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     const peerId = `trivo-${chatId.replace(/[^a-zA-Z0-9]/g, "").substring(0, 20)}`;
     connectToPeer(peerId);
 
-    const unsubStatus = listenForStatusUpdates(fingerprint || "", (messageId, status) => {
+    const unsubStatus = listenForStatusUpdates(userId || "", (messageId, status) => {
       setMessages((prev) =>
         prev.map((m) => (m.id === messageId ? { ...m, status: status as any } : m))
       );
     });
 
     return () => { unsubStatus(); };
-  }, [chatId, fingerprint]);
+  }, [chatId, userId]);
 
   useEffect(() => {
     const unsub = onP2PMessage((msg: P2PMessage) => {
@@ -120,7 +121,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           let blockedMessage: { title: string; footer: string } | undefined;
           const media = (msg as any).media as MediaAttachment | undefined;
           
-          if (media && msg.from !== fingerprint) {
+          if (media && msg.from !== userId) {
             const scanResult = simulateSecurityScan(media.name, false);
             if (!scanResult.safe) {
               blocked = true;
@@ -133,7 +134,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
             {
               id: msg.id,
               text: msg.text,
-              sent: msg.from === fingerprint,
+               sent: msg.from === userId,
               time: new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
               status: "delivered",
               media,
@@ -143,26 +144,26 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           ];
         });
         setSessionStarted(false);
-        if (msg.from !== fingerprint) {
+        if (msg.from !== userId) {
           updateMessageStatus(msg.from, msg.id, "read");
         }
       }
     });
     return unsub;
-  }, [chatId, fingerprint, language]);
+  }, [chatId, userId, language]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !fingerprint) return;
+    if (!input.trim() || !userId) return;
     
     const msgId = generateUUIDv4();
     const currentInput = input;
     const msg: P2PMessage = {
       id: msgId,
-      from: fingerprint,
+      from: userId,
       to: chatId,
       text: currentInput,
       timestamp: Date.now(),
@@ -225,7 +226,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
-    if (!file || !fingerprint) return;
+    if (!file || !userId) return;
     e.target.value = "";
 
     setUploading(true);
@@ -242,7 +243,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       const msgId = generateUUIDv4();
       const msg: P2PMessage & { media: MediaAttachment } = {
         id: msgId,
-        from: fingerprint,
+        from: userId,
         to: chatId,
         text: "",
         timestamp: Date.now(),
@@ -359,12 +360,14 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         <div ref={bottomRef} />
       </div>
 
-      <div className="glass-panel rounded-none border-x-0 border-b-0 shrink-0 p-2 flex items-center gap-2">
-        <button onClick={() => { setShowEmoji(!showEmoji); setShowAttach(false); }} className="p-2 text-muted-foreground"><Smile size={22} /></button>
-        <button onClick={() => { setShowAttach(!showAttach); setShowEmoji(false); }} className="p-2 text-muted-foreground"><Paperclip size={22} /></button>
-        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMessage()} placeholder={t("typeMessage")} className="glass-input flex-1 py-2 px-3 text-sm" />
-        <button onClick={sendMessage} className="p-2.5 rounded-xl bg-primary text-primary-foreground"><Send size={18} /></button>
-      </div>
+      <MessageInput
+        value={input}
+        onValueChange={setInput}
+        onSubmit={sendMessage}
+        onToggleEmoji={() => { setShowEmoji(!showEmoji); setShowAttach(false); }}
+        onToggleAttach={() => { setShowAttach(!showAttach); setShowEmoji(false); }}
+        placeholder={t("typeMessage")}
+      />
 
       <AnimatePresence>
         {showEmoji && <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden"><EmojiPicker onEmojiClick={(e) => setInput(prev => prev + e.emoji)} width="100%" height={300} theme={theme as any} /></motion.div>}
