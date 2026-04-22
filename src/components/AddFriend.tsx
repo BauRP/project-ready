@@ -6,7 +6,7 @@ import { useIdentity } from "@/contexts/IdentityContext";
 import { toast } from "sonner";
 import gun from "@/lib/gun-setup";
 import { saveChatMeta } from "@/lib/p2p";
-import { isValidBase58Id, publicKeyToBase58Id } from "@/lib/identity";
+import { isValidUserId } from "@/lib/identity";
 import { isUserBlocked, unblockUser } from "@/lib/report";
 import { sendFriendRequest, getOutgoingRequestStatus } from "@/lib/firebase-sync";
 import { getPresenceStatus } from "@/lib/presence";
@@ -18,14 +18,12 @@ const AddFriend = () => {
   const [pendingUnblockId, setPendingUnblockId] = useState("");
   const [addingStatus, setAddingStatus] = useState<"idle" | "adding" | "pending" | "done">("idle");
   const { t } = useLanguage();
-  const { fingerprint, identity } = useIdentity();
-
-  const myBase58Id = identity ? publicKeyToBase58Id(identity.signing.publicKey) : "";
+  const { userId, identity } = useIdentity();
 
   const handleCopy = async () => {
-    if (!myBase58Id) return;
+    if (!userId) return;
     try {
-      await navigator.clipboard.writeText(myBase58Id);
+      await navigator.clipboard.writeText(userId);
       setCopied(true);
       toast.success(t("idCopied"));
       setTimeout(() => setCopied(false), 2000);
@@ -38,12 +36,12 @@ const AddFriend = () => {
     const trimmed = peerId.trim();
     if (!trimmed) return;
 
-    if (!isValidBase58Id(trimmed)) {
+    if (!isValidUserId(trimmed)) {
       toast.error(t("invalidIdFormat"));
       return;
     }
 
-    if (trimmed === myBase58Id) {
+    if (trimmed === userId) {
       toast.error(t("cannotAddSelf"));
       return;
     }
@@ -60,26 +58,33 @@ const AddFriend = () => {
   };
 
   const addFriend = async (friendId: string) => {
-    if (!fingerprint || !identity) return;
+    if (!userId || !identity) return;
     setAddingStatus("adding");
+
+    const requestStatus = await getOutgoingRequestStatus(userId, friendId);
+    if (requestStatus === "pending") {
+      setAddingStatus("pending");
+      toast.info("Friend request already pending");
+      return;
+    }
 
     const peerStatus = getPresenceStatus(friendId);
 
     // Bi-directional Gun handshake
-    gun.get("trivo-friends").get(fingerprint).get(friendId).put({
+    gun.get("trivo-friends").get(userId).get(friendId).put({
       addedAt: Date.now(),
       status: peerStatus === "online" ? "confirmed" : "pending",
     });
-    gun.get("trivo-friends").get(friendId).get(fingerprint).put({
+    gun.get("trivo-friends").get(friendId).get(userId).put({
       addedAt: Date.now(),
       status: peerStatus === "online" ? "confirmed" : "pending",
     });
 
     // Send friend request via Firebase + GunDB for offline delivery
     await sendFriendRequest({
-      from: fingerprint,
+      from: userId,
       to: friendId,
-      fromName: fingerprint.substring(0, 8),
+      fromName: userId,
       signingKey: identity.signing.publicKey,
       exchangeKey: identity.exchange.publicKey,
       timestamp: Date.now(),
@@ -129,7 +134,7 @@ const AddFriend = () => {
           <p className="text-xs text-muted-foreground mb-2">{t("yourUniqueId")}</p>
           <div className="flex items-center gap-3">
             <p className="flex-1 font-mono text-sm text-foreground break-all select-all">
-              {myBase58Id || "..."}
+              {userId || "..."}
             </p>
             <button
               onClick={handleCopy}

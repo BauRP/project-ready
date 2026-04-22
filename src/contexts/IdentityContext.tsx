@@ -1,10 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { getOrCreateIdentity, getKeyFingerprint, type IdentityKeys } from "@/lib/crypto";
+import { getOrCreateUserId } from "@/lib/identity";
 import { publishPublicKeys } from "@/lib/gun-setup";
 import { nukeAllData } from "@/lib/storage";
 
 interface IdentityContextType {
   identity: IdentityKeys | null;
+  userId: string;
   fingerprint: string;
   isLoading: boolean;
   stealthMode: boolean;
@@ -16,6 +18,7 @@ const IdentityContext = createContext<IdentityContextType | undefined>(undefined
 
 export const IdentityProvider = ({ children }: { children: ReactNode }) => {
   const [identity, setIdentity] = useState<IdentityKeys | null>(null);
+  const [userId, setUserId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [stealthMode, setStealthMode] = useState(() => {
     try { return localStorage.getItem("trivo-stealth") === "true"; } catch { return false; }
@@ -27,18 +30,18 @@ export const IdentityProvider = ({ children }: { children: ReactNode }) => {
     const initIdentity = async () => {
       try {
         const keys = await getOrCreateIdentity();
+        const nextUserId = await getOrCreateUserId();
         if (cancelled) return;
 
         setIdentity(keys);
+        setUserId(nextUserId);
         setIsLoading(false);
 
-        const userId = getKeyFingerprint(keys.signing.publicKey);
-        
         // БОСС: Публикуем ключи не мгновенно, а даем GunDB 2 секунды на прогрев
         setTimeout(() => {
           try {
-            publishPublicKeys(userId, keys.signing.publicKey, keys.exchange.publicKey);
-            console.log("Личность опубликована в сети:", userId);
+            publishPublicKeys(nextUserId, keys.signing.publicKey, keys.exchange.publicKey);
+            console.log("Личность опубликована в сети:", nextUserId);
           } catch (e) {
             console.error("Ошибка публикации ключей:", e);
           }
@@ -71,7 +74,7 @@ export const IdentityProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <IdentityContext.Provider
-      value={{ identity, fingerprint, isLoading, stealthMode, toggleStealth, deleteAccount }}
+      value={{ identity, userId, fingerprint, isLoading, stealthMode, toggleStealth, deleteAccount }}
     >
       {children}
     </IdentityContext.Provider>
