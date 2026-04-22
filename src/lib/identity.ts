@@ -1,6 +1,24 @@
 // Decentralized Base58 Identity System
 import nacl from "tweetnacl";
 import bs58 from "bs58";
+import { dbGet, dbPut } from "./storage";
+
+const USER_ID_STORE = "identity";
+const USER_ID_KEY = "public-id";
+const USER_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+export function generateSecureUserId(length = 12): string {
+  const safeLength = Math.min(12, Math.max(10, length));
+
+  while (true) {
+    const random = crypto.getRandomValues(new Uint8Array(safeLength));
+    const candidate = Array.from(random, (value) => USER_ID_ALPHABET[value % USER_ID_ALPHABET.length]).join("");
+
+    if (/[A-Za-z]/.test(candidate) && /\d/.test(candidate)) {
+      return candidate;
+    }
+  }
+}
 
 /**
  * Generate a Base58-encoded User ID from the Ed25519 public key.
@@ -35,17 +53,24 @@ export function isValidBase58Id(id: string): boolean {
   }
 }
 
+export function isValidUserId(id: string): boolean {
+  return /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]{10,12}$/.test(id);
+}
+
+export async function getOrCreateUserId(): Promise<string> {
+  const existing = await dbGet<string>(USER_ID_STORE, USER_ID_KEY);
+  if (existing && isValidUserId(existing)) {
+    return existing;
+  }
+
+  const nextId = generateSecureUserId();
+  await dbPut(USER_ID_STORE, USER_ID_KEY, nextId);
+  return nextId;
+}
+
 /**
  * Get or create the local user's Base58 ID.
  */
 export async function getLocalBase58Id(): Promise<string> {
-  // Динамический импорт крипто-модуля
-  const { getOrCreateIdentity } = await import("./crypto");
-  const identity = await getOrCreateIdentity();
-  
-  if (!identity || !identity.signing || !identity.signing.publicKey) {
-    throw new Error("Не удалось получить криптографическую личность");
-  }
-  
-  return publicKeyToBase58Id(identity.signing.publicKey);
+  return getOrCreateUserId();
 }
