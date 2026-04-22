@@ -9,6 +9,9 @@
   .dark-theme {
     --ad-banner-height: 0px;
     --safe-top: env(safe-area-inset-top, 0px);
+    --bottom-nav-height: 60px;
+    --bottom-nav-offset: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    --app-top-offset: calc(var(--safe-top) + var(--ad-banner-height, 0px));
     --background: 232 25% 6%;
     --foreground: 210 20% 92%;
 
@@ -202,13 +205,12 @@
      --ad-height is set by Index.tsx: "50px" when AdMob banner is visible, else "0px".
      Smooth transition lets the app "breathe" when ads/network toggle. */
   .header-safe-zone {
-    /* App UI sits flush against the 50px ad banner (and below the status bar). */
-    padding-top: calc(var(--safe-top) + var(--ad-banner-height, 0px)) !important;
+    padding-top: 0 !important;
     transition: padding-top 0.2s ease-in-out;
   }
   /* Anchored offset (for absolutely positioned elements like the panic touch zone). */
   .safe-top-offset {
-    top: calc(var(--safe-top) + var(--ad-banner-height, 0px));
+    top: var(--app-top-offset);
     transition: top 0.2s ease-in-out;
   }
   /* Edge-to-edge ad container reset — kills any inherited max-width / padding. */

@@ -16,6 +16,7 @@ import { startPresence } from "@/lib/presence";
 import { performStartupHandshake, listenForFriendRequests, acceptFriendRequest } from "@/lib/firebase-sync";
 import { initMockPeer } from "@/lib/mock-peer";
 import { isDuplicateMessage } from "@/lib/gun-setup";
+import { AD_CONFIG, getAppTopOffset, getBottomNavOffset } from "@/lib/ad-config";
 import { toast } from "sonner";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 
@@ -174,17 +175,17 @@ const Index = () => {
   ) : null;
 
   const showAd = isOnline && !stealthMode;
-  // Single source of truth: AdMobBanner writes the loaded height into
-  // --ad-banner-height (0px hidden, 50px visible). Headers inside each tab
-  // consume it via .header-safe-zone — DO NOT add padding-top here, or it
-  // would double-count and push content below the ad twice.
   const rootStyle = {
     backgroundImage: "var(--gradient-bg)",
+    paddingTop: getAppTopOffset(),
+    ["--bottom-nav-offset" as string]: getBottomNavOffset(),
+    ["--bottom-nav-height" as string]: `${AD_CONFIG.BOTTOM_NAV_HEIGHT}px`,
+    ["--app-top-offset" as string]: getAppTopOffset(),
   } as React.CSSProperties;
 
   if (openChat) {
     return (
-      <div className="h-[100dvh] max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
+      <div className="h-screen max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
         {biometricOverlay}
         {showAd && <AdMobBanner stealthMode={stealthMode} />}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -200,7 +201,7 @@ const Index = () => {
   }
 
   return (
-    <div className="h-[100dvh] max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
+    <div className="h-screen max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
       {biometricOverlay}
       {showAd && <AdMobBanner stealthMode={stealthMode} />}
       <div
@@ -208,8 +209,7 @@ const Index = () => {
         className="absolute left-0 w-12 h-12 z-50 safe-top-offset"
         aria-hidden="true"
       />
-      {/* No top padding here — headers own their own safe zone for zero layout shift between tabs */}
-      <div className="flex-1 min-h-0 overflow-hidden pb-[72px]">
+      <div className="flex-1 min-h-0 overflow-hidden" style={{ paddingBottom: getBottomNavOffset() }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

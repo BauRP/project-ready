@@ -2,6 +2,7 @@ import { MessageCircle, UserPlus, Users, User, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { TranslationKey } from "@/i18n/translations";
+import { AD_CONFIG } from "@/lib/ad-config";
 
 type Tab = "chats" | "add-friend" | "friends" | "security" | "profile";
 
@@ -23,14 +24,22 @@ const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
 
   return (
     <nav 
-      className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto transition-all duration-200" 
-      style={{ 
-        // ИСПРАВЛЕНИЕ: Добавляем отступ под рекламу и безопасную зону iPhone
-        paddingBottom: "calc(var(--ad-banner-height, 0px) + env(safe-area-inset-bottom, 0px))",
-        marginBottom: "var(--ad-banner-height, 0px)"
+      className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto"
+      style={{
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
       }}
     >
-      <div className="glass-panel px-2 py-1 rounded-none rounded-t-2xl neon-border border-b-0">
+      <div
+        className="glass-panel px-2 rounded-none rounded-t-2xl neon-border border-b-0"
+        style={{
+          minHeight: AD_CONFIG.BOTTOM_NAV_HEIGHT,
+          paddingTop: 4,
+          paddingBottom: "calc(4px + env(safe-area-inset-bottom, 0px))",
+        }}
+      >
         <div className="flex items-center justify-around">
           {tabs.map((tab) => {
             const Icon = tab.icon;
