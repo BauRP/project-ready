@@ -76,6 +76,7 @@ export type TranslationKey =
   | "oneHour"
   | "sixHours"
   | "twelveHours"
+  | "twentyFourHours"
   | "always"
   | "cancel"
   | "ok"
@@ -116,7 +117,9 @@ export type TranslationKey =
   | "reportHateSpeech"
   | "mediaUploaded"
   | "mediaUploadFailed"
-  | "uploading";
+  | "uploading"
+  | "disappearingMessages"
+  | "translationSettings";
 
 type TranslationMap = Partial<Record<TranslationKey, string>>;
 
@@ -198,6 +201,7 @@ const en: TranslationMap = {
   oneHour: "1 hour",
   sixHours: "6 hours",
   twelveHours: "12 hours",
+  twentyFourHours: "24 hours",
   always: "Always",
   cancel: "Cancel",
   ok: "OK",
@@ -239,6 +243,8 @@ const en: TranslationMap = {
   mediaUploaded: "Media sent",
   mediaUploadFailed: "Upload failed",
   uploading: "Uploading...",
+  disappearingMessages: "Disappearing Messages",
+  translationSettings: "Translation Settings",
 };
 
 const ru: TranslationMap = {
@@ -319,6 +325,7 @@ const ru: TranslationMap = {
   oneHour: "1 час",
   sixHours: "6 часов",
   twelveHours: "12 часов",
+  twentyFourHours: "24 часа",
   always: "Всегда",
   cancel: "Отмена",
   ok: "ОК",
@@ -358,6 +365,8 @@ const ru: TranslationMap = {
   reportIllegal: "Незаконная деятельность",
   reportHateSpeech: "Разжигание ненависти",
   mediaUploaded: "Медиа отправлено",
+  disappearingMessages: "Исчезающие сообщения",
+  translationSettings: "Настройки перевода",
   mediaUploadFailed: "Ошибка загрузки",
   uploading: "Загрузка...",
 };
