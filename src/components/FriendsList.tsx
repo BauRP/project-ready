@@ -86,6 +86,11 @@ const FriendsList = ({ onOpenChat }: FriendsListProps) => {
     setFriends((prev) => prev.map((f) => (f.id === id ? { ...f, starred: !f.starred } : f)));
     await updateChatPreferences(id, { favorite: !friends.find((f) => f.id === id)?.starred });
     setMenuOpen(null);
+    const starred = (await dbGet<string[]>("settings", "starred-friends")) || [];
+    const updated = starred.includes(id) ? starred.filter((s) => s !== id) : [...starred, id];
+    await dbPut("settings", "starred-friends", updated);
+  };
+
   const handleMute = async (duration: string) => {
     if (!muteTarget) return;
     await updateChatPreferences(muteTarget, { mutedUntil: getMuteUntil(duration === "always" ? "off" : duration as DisappearingDuration) });
@@ -98,11 +103,6 @@ const FriendsList = ({ onOpenChat }: FriendsListProps) => {
     await updateChatPreferences(disappearingTarget, { disappearingDuration: duration });
     setDisappearingTarget(null);
     setMenuOpen(null);
-  };
-
-    const starred = (await dbGet<string[]>("settings", "starred-friends")) || [];
-    const updated = starred.includes(id) ? starred.filter((s) => s !== id) : [...starred, id];
-    await dbPut("settings", "starred-friends", updated);
   };
 
   const statusLabelMap: Record<string, string> = {
