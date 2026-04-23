@@ -1,6 +1,6 @@
 // P2P messaging service using PeerJS (WebRTC DataChannels)
 import Peer, { DataConnection } from "peerjs";
-import { dbGet, dbPut, dbGetAll } from "./storage";
+import { dbDelete, dbGet, dbPut, dbGetAll } from "./storage";
 
 export interface P2PMessage {
   id: string;
@@ -186,6 +186,21 @@ export async function flushPendingMessages(peerId: string) {
 
 async function saveMessage(msg: P2PMessage) {
   await dbPut("messages", msg.id, msg);
+}
+
+export async function purgeExpiredLocalMessages(): Promise<number> {
+  const all = await dbGetAll<P2PMessage>("messages");
+  const expired = all.filter((message) => !!message.deleteAt && message.deleteAt <= Date.now());
+
+  await Promise.all(expired.map((message) => dbDelete("messages", message.id)));
+  return expired.length;
+}
+
+export async function clearMessagesForChat(friendId: string): Promise<void> {
+  const all = await dbGetAll<P2PMessage>("messages");
+  const related = all.filter((message) => message.from === friendId || message.to === friendId);
+
+  await Promise.all(related.map((message) => dbDelete("messages", message.id)));
 }
 
 export async function getMessagesForChat(friendId: string): Promise<P2PMessage[]> {
