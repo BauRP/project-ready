@@ -109,8 +109,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     const loadMessages = async () => {
       const stored = await getMessagesForChat(chatId);
       if (stored.length === 0) setSessionStarted(true);
-      setMessages(
-        stored.map((m) => ({
+      const nextMessages = stored.map((m) => ({
           id: m.id,
           text: m.text,
           sent: m.from === userId,
@@ -120,8 +119,10 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           caption: (m as any).caption,
           deleteAt: (m as any).deleteAt,
         }))
-        .filter((m) => !isExpired(m.deleteAt))
-      );
+        .filter((m) => !isExpired(m.deleteAt));
+
+      setMessages(nextMessages);
+      await syncIncomingTranslations(nextMessages);
       const preferences = await getChatPreferences(chatId);
       setDisappearingDuration(preferences.disappearingDuration || "off");
       
@@ -147,13 +148,20 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   }, [chatId, userId]);
 
   useEffect(() => {
-    void syncIncomingTranslations(messages);
+    const handleRefresh = () => {
+      setMessages((prev) => prev.filter((message) => !isExpired(message.deleteAt)));
+      void syncIncomingTranslations(messages.filter((message) => !isExpired(message.deleteAt)));
+    };
 
+    window.addEventListener("focus", handleRefresh);
     const interval = window.setInterval(() => {
       setMessages((prev) => prev.filter((message) => !isExpired(message.deleteAt)));
     }, 30_000);
 
-    return () => window.clearInterval(interval);
+    return () => {
+      window.removeEventListener("focus", handleRefresh);
+      window.clearInterval(interval);
+    };
   }, [messages]);
 
   useEffect(() => {
