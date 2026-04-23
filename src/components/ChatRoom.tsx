@@ -80,6 +80,21 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const { theme } = useTheme();
   const { userId } = useIdentity();
 
+  const syncIncomingTranslations = async (items: Message[]) => {
+    const translated = await Promise.all(
+      items.map(async (message) => {
+        if (message.sent || !message.text.trim() || isExpired(message.deleteAt)) {
+          return { ...message, translatedText: null };
+        }
+
+        const translatedText = await translateIncomingMessage(message.text);
+        return { ...message, translatedText };
+      }),
+    );
+
+    setMessages((prev) => prev.map((message) => translated.find((item) => item.id === message.id) || message));
+  };
+
   // Presence subscription
   useEffect(() => {
     setPeerStatus(getPresenceStatus(chatId));
@@ -94,8 +109,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     const loadMessages = async () => {
       const stored = await getMessagesForChat(chatId);
       if (stored.length === 0) setSessionStarted(true);
-      setMessages(
-        stored.map((m) => ({
+      const nextMessages = stored.map((m) => ({
           id: m.id,
           text: m.text,
           sent: m.from === userId,
@@ -105,8 +119,10 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           caption: (m as any).caption,
           deleteAt: (m as any).deleteAt,
         }))
-        .filter((m) => !isExpired(m.deleteAt))
-      );
+        .filter((m) => !isExpired(m.deleteAt));
+
+      setMessages(nextMessages);
+      await syncIncomingTranslations(nextMessages);
       const preferences = await getChatPreferences(chatId);
       setDisappearingDuration(preferences.disappearingDuration || "off");
       
@@ -130,6 +146,23 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
 
     return () => { unsubStatus(); };
   }, [chatId, userId]);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      setMessages((prev) => prev.filter((message) => !isExpired(message.deleteAt)));
+      void syncIncomingTranslations(messages.filter((message) => !isExpired(message.deleteAt)));
+    };
+
+    window.addEventListener("focus", handleRefresh);
+    const interval = window.setInterval(() => {
+      setMessages((prev) => prev.filter((message) => !isExpired(message.deleteAt)));
+    }, 30_000);
+
+    return () => {
+      window.removeEventListener("focus", handleRefresh);
+      window.clearInterval(interval);
+    };
+  }, [messages]);
 
   useEffect(() => {
     const unsub = onP2PMessage((msg: P2PMessage) => {
@@ -170,8 +203,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         setSessionStarted(false);
         if (msg.from !== userId) {
           translateIncomingMessage(msg.text).then((translatedText) => {
-            if (!translatedText) return;
-            setMessages((prev) => prev.map((item) => item.id === msg.id ? { ...item, translatedText } : item));
+            setMessages((prev) => prev.map((item) => item.id === msg.id ? { ...item, translatedText: translatedText || null } : item));
           });
           notifyIncomingMessage(name, msg.text || (msg as any).media?.name || "New media");
           updateMessageStatus(msg.from, msg.id, "read");
@@ -488,6 +520,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         onClose={() => { setForwardSheetOpen(false); setForwardingMedia(null); }}
         onSubmit={async (targetChatId, caption) => {
           if (!userId || !forwardingMedia) return;
+          const targetPreferences = await getChatPreferences(targetChatId);
           const msgId = generateUUIDv4();
           const payload: P2PMessage = {
             id: msgId,
@@ -498,7 +531,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
             status: "sent",
             media: forwardingMedia,
             caption,
-            deleteAt: getDeleteAt(Date.now(), disappearingDuration),
+            deleteAt: getDeleteAt(Date.now(), targetPreferences.disappearingDuration || "off"),
           };
           const peerId = `trivo-${targetChatId.replace(/[^a-zA-Z0-9]/g, "").substring(0, 20)}`;
           const sent = await sendP2PMessage(peerId, payload);

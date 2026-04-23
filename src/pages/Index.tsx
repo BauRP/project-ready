@@ -10,10 +10,10 @@ import SecurityDashboard from "@/components/SecurityDashboard";
 import AdMobBanner from "@/components/AdMobBanner";
 import { useIdentity } from "@/contexts/IdentityContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { initPeer, onP2PMessage, onConnectionChange, flushPendingMessages, saveChatMeta, getChatMeta, type P2PMessage } from "@/lib/p2p";
+import { initPeer, onP2PMessage, onConnectionChange, flushPendingMessages, purgeExpiredLocalMessages, saveChatMeta, getChatMeta, type P2PMessage } from "@/lib/p2p";
 import { executePanic, createPanicLongPress } from "@/lib/panic";
 import { startPresence } from "@/lib/presence";
-import { performStartupHandshake, listenForFriendRequests, acceptFriendRequest } from "@/lib/firebase-sync";
+import { performStartupHandshake, listenForFriendRequests, acceptFriendRequest, purgeExpiredBufferedMessagesForAllUsers } from "@/lib/firebase-sync";
 import { initMockPeer } from "@/lib/mock-peer";
 import { isDuplicateMessage } from "@/lib/gun-setup";
 import { AD_CONFIG, BANNER_HEIGHT, getAppTopOffset, getBottomNavOffset } from "@/lib/ad-config";
@@ -134,6 +134,20 @@ const Index = () => {
       stopPresence();
     };
   }, [userId, language]);
+
+  useEffect(() => {
+    const purgeExpired = async () => {
+      await purgeExpiredLocalMessages();
+      await purgeExpiredBufferedMessagesForAllUsers();
+    };
+
+    purgeExpired().catch(() => {});
+    const interval = window.setInterval(() => {
+      purgeExpired().catch(() => {});
+    }, 60_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
