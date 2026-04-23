@@ -80,6 +80,21 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const { theme } = useTheme();
   const { userId } = useIdentity();
 
+  const syncIncomingTranslations = async (items: Message[]) => {
+    const translated = await Promise.all(
+      items.map(async (message) => {
+        if (message.sent || !message.text.trim() || isExpired(message.deleteAt)) {
+          return { ...message, translatedText: null };
+        }
+
+        const translatedText = await translateIncomingMessage(message.text);
+        return { ...message, translatedText };
+      }),
+    );
+
+    setMessages((prev) => prev.map((message) => translated.find((item) => item.id === message.id) || message));
+  };
+
   // Presence subscription
   useEffect(() => {
     setPeerStatus(getPresenceStatus(chatId));
@@ -132,6 +147,16 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   }, [chatId, userId]);
 
   useEffect(() => {
+    void syncIncomingTranslations(messages);
+
+    const interval = window.setInterval(() => {
+      setMessages((prev) => prev.filter((message) => !isExpired(message.deleteAt)));
+    }, 30_000);
+
+    return () => window.clearInterval(interval);
+  }, [messages]);
+
+  useEffect(() => {
     const unsub = onP2PMessage((msg: P2PMessage) => {
       if (msg.from === chatId || msg.to === chatId) {
         if (isDuplicateMessage(msg.id)) return;
@@ -170,8 +195,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         setSessionStarted(false);
         if (msg.from !== userId) {
           translateIncomingMessage(msg.text).then((translatedText) => {
-            if (!translatedText) return;
-            setMessages((prev) => prev.map((item) => item.id === msg.id ? { ...item, translatedText } : item));
+            setMessages((prev) => prev.map((item) => item.id === msg.id ? { ...item, translatedText: translatedText || null } : item));
           });
           notifyIncomingMessage(name, msg.text || (msg as any).media?.name || "New media");
           updateMessageStatus(msg.from, msg.id, "read");
@@ -488,6 +512,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         onClose={() => { setForwardSheetOpen(false); setForwardingMedia(null); }}
         onSubmit={async (targetChatId, caption) => {
           if (!userId || !forwardingMedia) return;
+          const targetPreferences = await getChatPreferences(targetChatId);
           const msgId = generateUUIDv4();
           const payload: P2PMessage = {
             id: msgId,
@@ -498,7 +523,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
             status: "sent",
             media: forwardingMedia,
             caption,
-            deleteAt: getDeleteAt(Date.now(), disappearingDuration),
+            deleteAt: getDeleteAt(Date.now(), targetPreferences.disappearingDuration || "off"),
           };
           const peerId = `trivo-${targetChatId.replace(/[^a-zA-Z0-9]/g, "").substring(0, 20)}`;
           const sent = await sendP2PMessage(peerId, payload);

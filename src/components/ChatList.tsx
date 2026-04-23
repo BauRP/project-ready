@@ -154,7 +154,11 @@ const ChatList = ({ onOpenChat }: ChatListProps) => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="font-semibold text-foreground truncate">{chat.name}</span>
-                    <span className="text-xs text-muted-foreground shrink-0 ml-auto">{chat.time}</span>
+                    <div className="ml-auto flex items-center gap-1 shrink-0">
+                      {chat.muted && <VolumeX size={12} className="text-muted-foreground" />}
+                      {chat.blocked && <Ban size={12} className="text-muted-foreground" />}
+                      <span className="text-xs text-muted-foreground">{chat.time}</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     {chat.lastMessage ? (
@@ -171,7 +175,6 @@ const ChatList = ({ onOpenChat }: ChatListProps) => {
                         {t("e2eSessionStarted") || "E2E Session"}
                       </span>
                     )}
-                    {chat.muted && <VolumeX size={12} className="text-muted-foreground/40 shrink-0" />}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0 ml-1">
