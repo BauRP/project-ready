@@ -5,7 +5,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import DefaultAvatar from "./DefaultAvatar";
 import MuteModal from "./MuteModal";
 import DisappearingMessagesModal from "./DisappearingMessagesModal";
-import { getAllChatMetas, type ChatMeta } from "@/lib/p2p";
+import { clearMessagesForChat, getAllChatMetas, type ChatMeta } from "@/lib/p2p";
 import { subscribeToPresence, getPresenceStatus, onPresenceChange } from "@/lib/presence";
 import { dbGet, dbPut } from "@/lib/storage";
 import { blockUser, unblockUser } from "@/lib/report";
@@ -71,6 +71,11 @@ const FriendsList = ({ onOpenChat }: FriendsListProps) => {
 
   const removeFriend = (id: string) => {
     setFriends((prev) => prev.filter((f) => f.id !== id));
+    setMenuOpen(null);
+  };
+
+  const clearChat = async (id: string) => {
+    await clearMessagesForChat(id);
     setMenuOpen(null);
   };
 
@@ -183,7 +188,7 @@ const FriendsList = ({ onOpenChat }: FriendsListProps) => {
                     <button onClick={(e) => { e.stopPropagation(); setMuteTarget(friend.id); }} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
                       <VolumeX size={14} className="text-yellow-400" /> {t("mute")}
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); }} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
+                    <button onClick={(e) => { e.stopPropagation(); void clearChat(friend.id); }} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
                       <Trash2 size={14} className="text-orange-400" /> {t("clearChat")}
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); toggleBlock(friend.id); }} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
