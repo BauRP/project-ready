@@ -17,6 +17,7 @@ import {
 import gun from "./gun-setup";
 import { dbPut, dbGet, dbGetAll } from "./storage";
 import type { P2PMessage, ChatMeta } from "./p2p";
+import { isExpired } from "./chat-preferences";
 
 let db: Database;
 try {
@@ -182,6 +183,25 @@ export interface BufferedMessage {
   storedAt: number;
 }
 
+export async function purgeExpiredBufferedMessages(userId: string): Promise<void> {
+  if (db) {
+    try {
+      const msgRef = ref(db, `offline_messages/${userId}`);
+      const snapshot = await get(msgRef);
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        await Promise.all(
+          Object.entries(data).map(async ([msgId, value]: [string, any]) => {
+            if (isExpired(value?.deleteAt)) {
+              await remove(ref(db, `offline_messages/${userId}/${msgId}`));
+            }
+          }),
+        );
+      }
+    } catch {}
+  }
+}
+
 /**
  * Buffer a message in Firebase for offline recipient
  */
@@ -212,6 +232,7 @@ export async function bufferMessageInCloud(
       nonce: msg.nonce || "",
       timestamp: msg.timestamp,
       status: "pending",
+      deleteAt: msg.deleteAt || null,
       media: (msg as any).media ? JSON.stringify((msg as any).media) : "",
     });
   } catch {}
@@ -232,6 +253,7 @@ export async function fetchBufferedMessages(userId: string): Promise<P2PMessage[
       if (snapshot.exists()) {
         const data = snapshot.val();
         Object.entries(data).forEach(([msgId, msgData]: [string, any]) => {
+          if (isExpired(msgData.deleteAt)) return;
           messages.set(msgId, {
             id: msgId,
             from: msgData.from,
@@ -241,6 +263,7 @@ export async function fetchBufferedMessages(userId: string): Promise<P2PMessage[
             nonce: msgData.nonce,
             timestamp: msgData.timestamp,
             status: "delivered" as const,
+            deleteAt: msgData.deleteAt || undefined,
             ...(msgData.media ? { media: typeof msgData.media === "string" ? JSON.parse(msgData.media) : msgData.media } : {}),
           } as P2PMessage);
         });
@@ -256,6 +279,7 @@ export async function fetchBufferedMessages(userId: string): Promise<P2PMessage[
       let resolved = false;
       gun.get("trivo-offline").get(userId).map().once((data: any, key: string) => {
         if (!data || !data.from) return;
+        if (isExpired(data.deleteAt)) return;
         if (!messages.has(key)) {
           const msg: any = {
             id: key,
@@ -266,6 +290,7 @@ export async function fetchBufferedMessages(userId: string): Promise<P2PMessage[
             nonce: data.nonce,
             timestamp: data.timestamp,
             status: "delivered",
+            deleteAt: data.deleteAt || undefined,
           };
           if (data.media) {
             try { msg.media = JSON.parse(data.media); } catch {}
