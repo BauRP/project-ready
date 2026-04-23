@@ -1,12 +1,15 @@
-import { MessageCircle, MoreVertical, VolumeX, Trash2, Ban, Star, StarOff } from "lucide-react";
+import { MoreVertical, VolumeX, Trash2, Ban, Star, StarOff, TimerReset } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import DefaultAvatar from "./DefaultAvatar";
 import MuteModal from "./MuteModal";
+import DisappearingMessagesModal from "./DisappearingMessagesModal";
 import { getAllChatMetas, type ChatMeta } from "@/lib/p2p";
 import { subscribeToPresence, getPresenceStatus, onPresenceChange } from "@/lib/presence";
 import { dbGet, dbPut } from "@/lib/storage";
+import { blockUser, unblockUser } from "@/lib/report";
+import { getChatPreferences, getMuteUntil, updateChatPreferences, type DisappearingDuration } from "@/lib/chat-preferences";
 
 interface Friend {
   id: string;
@@ -31,19 +34,23 @@ const FriendsList = ({ onOpenChat }: FriendsListProps) => {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [muteTarget, setMuteTarget] = useState<string | null>(null);
+  const [disappearingTarget, setDisappearingTarget] = useState<string | null>(null);
   const { t } = useLanguage();
 
   useEffect(() => {
     const loadFriends = async () => {
       const metas = await getAllChatMetas();
       const starred = (await dbGet<string[]>("settings", "starred-friends")) || [];
-      const friendList: Friend[] = metas.map((m: ChatMeta) => ({
-        id: m.friendId,
-        name: m.friendName,
-        avatar: m.friendAvatar || null,
-        status: getPresenceStatus(m.friendId),
-        blocked: false,
-        starred: starred.includes(m.friendId),
+      const friendList: Friend[] = await Promise.all(metas.map(async (m: ChatMeta) => {
+        const preferences = await getChatPreferences(m.friendId);
+        return {
+          id: m.friendId,
+          name: m.friendName,
+          avatar: m.friendAvatar || null,
+          status: getPresenceStatus(m.friendId),
+          blocked: !!preferences.blocked,
+          starred: starred.includes(m.friendId) || !!preferences.favorite,
+        };
       }));
       setFriends(friendList);
     };
@@ -67,14 +74,32 @@ const FriendsList = ({ onOpenChat }: FriendsListProps) => {
     setMenuOpen(null);
   };
 
-  const toggleBlock = (id: string) => {
+  const toggleBlock = async (id: string) => {
     setFriends((prev) => prev.map((f) => (f.id === id ? { ...f, blocked: !f.blocked } : f)));
+    const nextBlocked = !friends.find((f) => f.id === id)?.blocked;
+    await updateChatPreferences(id, { blocked: nextBlocked });
+    if (nextBlocked) await blockUser(id); else await unblockUser(id);
     setMenuOpen(null);
   };
 
   const toggleStar = async (id: string) => {
     setFriends((prev) => prev.map((f) => (f.id === id ? { ...f, starred: !f.starred } : f)));
+    await updateChatPreferences(id, { favorite: !friends.find((f) => f.id === id)?.starred });
     setMenuOpen(null);
+  const handleMute = async (duration: string) => {
+    if (!muteTarget) return;
+    await updateChatPreferences(muteTarget, { mutedUntil: getMuteUntil(duration === "always" ? "off" : duration as DisappearingDuration) });
+    setMuteTarget(null);
+    setMenuOpen(null);
+  };
+
+  const handleDisappearing = async (duration: DisappearingDuration) => {
+    if (!disappearingTarget) return;
+    await updateChatPreferences(disappearingTarget, { disappearingDuration: duration });
+    setDisappearingTarget(null);
+    setMenuOpen(null);
+  };
+
     const starred = (await dbGet<string[]>("settings", "starred-friends")) || [];
     const updated = starred.includes(id) ? starred.filter((s) => s !== id) : [...starred, id];
     await dbPut("settings", "starred-friends", updated);
@@ -155,14 +180,11 @@ const FriendsList = ({ onOpenChat }: FriendsListProps) => {
                     exit={{ opacity: 0, scale: 0.9 }}
                     className="absolute right-3 top-14 glass-panel py-1 z-20 min-w-[170px] neon-border"
                   >
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onOpenChat(friend.id, friend.name, ""); setMenuOpen(null); }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full"
-                    >
-                      <MessageCircle size={14} className="text-primary" /> {t("message")}
-                    </button>
                     <button onClick={(e) => { e.stopPropagation(); setMuteTarget(friend.id); }} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
                       <VolumeX size={14} className="text-yellow-400" /> {t("mute")}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); }} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
+                      <Trash2 size={14} className="text-orange-400" /> {t("clearChat")}
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); toggleBlock(friend.id); }} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
                       <Ban size={14} className="text-red-400" /> {friend.blocked ? t("unblock") : t("block")}
@@ -170,6 +192,9 @@ const FriendsList = ({ onOpenChat }: FriendsListProps) => {
                     <button onClick={(e) => { e.stopPropagation(); toggleStar(friend.id); }} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
                       {friend.starred ? <StarOff size={14} className="text-primary" /> : <Star size={14} className="text-primary" />}
                       {friend.starred ? t("removeFromFavorites") : t("addToFavorites")}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); setDisappearingTarget(friend.id); }} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
+                      <TimerReset size={14} className="text-primary" /> {t("disappearingMessages")}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); removeFriend(friend.id); }}
@@ -184,7 +209,8 @@ const FriendsList = ({ onOpenChat }: FriendsListProps) => {
           ))}
         </AnimatePresence>
       </div>
-      <MuteModal open={!!muteTarget} onClose={() => setMuteTarget(null)} onMute={() => setMuteTarget(null)} />
+      <MuteModal open={!!muteTarget} onClose={() => setMuteTarget(null)} onMute={handleMute} />
+      <DisappearingMessagesModal open={!!disappearingTarget} onClose={() => setDisappearingTarget(null)} onSelect={handleDisappearing} />
     </div>
   );
 };

@@ -1,11 +1,14 @@
-import { Star, Check, CheckCheck, MoreVertical, VolumeX, Trash2, Ban, StarOff } from "lucide-react";
+import { Star, Check, CheckCheck, MoreVertical, VolumeX, Trash2, Ban, StarOff, TimerReset } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import DefaultAvatar from "./DefaultAvatar";
 import MuteModal from "./MuteModal";
+import DisappearingMessagesModal from "./DisappearingMessagesModal";
 import { getAllChatMetas, type ChatMeta } from "@/lib/p2p";
 import { dbGet, dbPut } from "@/lib/storage";
+import { getChatPreferences, getMuteUntil, updateChatPreferences, type DisappearingDuration } from "@/lib/chat-preferences";
+import { blockUser, unblockUser } from "@/lib/report";
 
 interface Chat {
   id: string;
@@ -28,25 +31,29 @@ const ChatList = ({ onOpenChat }: ChatListProps) => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [muteTarget, setMuteTarget] = useState<string | null>(null);
+  const [disappearingTarget, setDisappearingTarget] = useState<string | null>(null);
   const { t } = useLanguage();
 
   useEffect(() => {
     const loadChats = async () => {
       const metas = await getAllChatMetas();
       const starred = (await dbGet<string[]>("settings", "starred-chats")) || [];
-      const chatList: Chat[] = metas.map((m: ChatMeta) => ({
-        id: m.friendId,
-        name: m.friendName,
-        avatar: m.friendAvatar || null,
-        lastMessage: m.lastMessage || (t("e2eSessionStarted") || "E2E Encrypted Session Started"),
-        time: m.lastMessageTime
-          ? new Date(m.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-          : "",
-        unread: m.unread,
-        starred: starred.includes(m.friendId),
-        status: "sent" as const,
-        muted: false,
-        blocked: false,
+      const chatList: Chat[] = await Promise.all(metas.map(async (m: ChatMeta) => {
+        const preferences = await getChatPreferences(m.friendId);
+        return {
+          id: m.friendId,
+          name: m.friendName,
+          avatar: m.friendAvatar || null,
+          lastMessage: m.lastMessage || (t("e2eSessionStarted") || "E2E Encrypted Session Started"),
+          time: m.lastMessageTime
+            ? new Date(m.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "",
+          unread: m.unread,
+          starred: starred.includes(m.friendId) || !!preferences.favorite,
+          status: "sent" as const,
+          muted: !!preferences.mutedUntil && preferences.mutedUntil > Date.now(),
+          blocked: !!preferences.blocked,
+        };
       }));
       setChats(chatList);
     };
@@ -68,8 +75,11 @@ const ChatList = ({ onOpenChat }: ChatListProps) => {
     setMenuOpen(null);
   };
 
-  const toggleBlock = (id: string) => {
+  const toggleBlock = async (id: string) => {
     setChats((prev) => prev.map((c) => (c.id === id ? { ...c, blocked: !c.blocked } : c)));
+    const nextBlocked = !chats.find((c) => c.id === id)?.blocked;
+    await updateChatPreferences(id, { blocked: nextBlocked });
+    if (nextBlocked) await blockUser(id); else await unblockUser(id);
     setMenuOpen(null);
   };
 
@@ -81,8 +91,16 @@ const ChatList = ({ onOpenChat }: ChatListProps) => {
   const handleMute = (duration: string) => {
     if (muteTarget) {
       setChats((prev) => prev.map((c) => (c.id === muteTarget ? { ...c, muted: true } : c)));
+      updateChatPreferences(muteTarget, { mutedUntil: getMuteUntil(duration === "always" ? "off" : duration as DisappearingDuration) });
     }
     setMuteTarget(null);
+    setMenuOpen(null);
+  };
+
+  const handleDisappearing = async (duration: DisappearingDuration) => {
+    if (!disappearingTarget) return;
+    await updateChatPreferences(disappearingTarget, { disappearingDuration: duration });
+    setDisappearingTarget(null);
     setMenuOpen(null);
   };
 
@@ -200,6 +218,9 @@ const ChatList = ({ onOpenChat }: ChatListProps) => {
                       {chat.starred ? <StarOff size={14} className="text-primary" /> : <Star size={14} className="text-primary" />}
                       {chat.starred ? t("removeFromFavorites") : t("addToFavorites")}
                     </button>
+                    <button onClick={() => setDisappearingTarget(chat.id)} className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 w-full">
+                      <TimerReset size={14} className="text-primary" /> {t("disappearingMessages")}
+                    </button>
                     <button onClick={() => deleteChat(chat.id)} className="flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-secondary/50 w-full">
                       <Trash2 size={14} /> {t("deleteFriend")}
                     </button>
@@ -211,6 +232,7 @@ const ChatList = ({ onOpenChat }: ChatListProps) => {
         </AnimatePresence>
       </div>
       <MuteModal open={!!muteTarget} onClose={() => setMuteTarget(null)} onMute={handleMute} />
+      <DisappearingMessagesModal open={!!disappearingTarget} onClose={() => setDisappearingTarget(null)} onSelect={handleDisappearing} />
     </div>
   );
 };

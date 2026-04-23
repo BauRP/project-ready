@@ -1,4 +1,4 @@
-import { ArrowLeft, Moon, Shield, Bell, Globe, Fingerprint, Sun, EyeOff, FileText, Trash2, Mail, ExternalLink, BellOff } from "lucide-react";
+import { ArrowLeft, Moon, Shield, Bell, Globe, Fingerprint, Sun, EyeOff, FileText, Trash2, Mail, ExternalLink, BellOff, Languages } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -6,6 +6,7 @@ import { useIdentity } from "@/contexts/IdentityContext";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 import { languageNames } from "@/i18n/translations";
 import TransparencyPage from "./TransparencyPage";
+import TranslationSettingsPanel from "./TranslationSettingsPanel";
 import { Separator } from "./ui/separator";
 import { nukeAllData } from "@/lib/storage";
 
@@ -38,10 +39,15 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
     return localStorage.getItem("trivo-hide-content") === "true";
   });
   const [showTransparency, setShowTransparency] = useState(false);
+  const [showTranslationSettings, setShowTranslationSettings] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   if (showTransparency) {
     return <TransparencyPage onBack={() => setShowTransparency(false)} />;
+  }
+
+  if (showTranslationSettings) {
+    return <TranslationSettingsPanel onBack={() => setShowTranslationSettings(false)} />;
   }
 
   const handleToggleNotifications = async () => {
@@ -100,6 +106,15 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
             ))}
           </select>
         </div>
+
+        <button
+          onClick={() => setShowTranslationSettings(true)}
+          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl glass-panel-sm mt-1.5 text-left"
+        >
+          <Languages size={18} className="text-primary" />
+          <span className="flex-1 text-sm text-foreground">{t("translationSettings")}</span>
+          <ArrowLeft size={14} className="text-muted-foreground rotate-180" />
+        </button>
 
         <Separator className="my-3 bg-border/40" />
 
