@@ -13,6 +13,7 @@ const MuteModal = ({ open, onClose, onMute }: MuteModalProps) => {
     { key: "oneHour", value: "1h" },
     { key: "sixHours", value: "6h" },
     { key: "twelveHours", value: "12h" },
+    { key: "twentyFourHours", value: "24h" },
     { key: "always", value: "always" },
   ] as const;
 

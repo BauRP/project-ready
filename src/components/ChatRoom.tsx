@@ -1,7 +1,8 @@
-import { ArrowLeft, Paperclip, Send, Smile, Image, FileText, Music, Check, CheckCheck, Phone, Video, Flag, Download, Clock, Mic, ShieldAlert } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { ArrowLeft, FileText, Check, CheckCheck, Phone, Video, Flag, Download, Clock, ShieldAlert, Search } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
+import { Share } from "@capacitor/share";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useIdentity } from "@/contexts/IdentityContext";
@@ -26,6 +27,11 @@ import { bufferMessageInCloud, updateMessageStatus, listenForStatusUpdates } fro
 import AudioWaveformPlayer from "./AudioWaveformPlayer";
 import SecurityScanOverlay from "./SecurityScanOverlay";
 import MessageInput from "./MessageInput";
+import ChatSelectionBar from "./ChatSelectionBar";
+import ChatSearchBar from "./ChatSearchBar";
+import ForwardMediaSheet from "./ForwardMediaSheet";
+import { getChatPreferences, getDeleteAt, isExpired } from "@/lib/chat-preferences";
+import { notifyIncomingMessage, translateIncomingMessage } from "@/lib/notifications";
 
 interface Message {
   id: string;
@@ -36,6 +42,9 @@ interface Message {
   media?: MediaAttachment;
   blocked?: boolean;
   blockedMessage?: { title: string; footer: string };
+  caption?: string;
+  deleteAt?: number;
+  translatedText?: string | null;
 }
 
 interface ChatRoomProps {
@@ -57,8 +66,16 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const [peerStatus, setPeerStatus] = useState<"online" | "away" | "offline">("offline");
   const [scanOverlay, setScanOverlay] = useState(false);
   const [pendingDownload, setPendingDownload] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+  const [forwardingMedia, setForwardingMedia] = useState<MediaAttachment | null>(null);
+  const [forwardSheetOpen, setForwardSheetOpen] = useState(false);
+  const [disappearingDuration, setDisappearingDuration] = useState<"1h" | "6h" | "12h" | "24h" | "off">("off");
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { userId } = useIdentity();
@@ -85,8 +102,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           time: new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           status: m.status as any || "sent",
           media: (m as any).media,
+          caption: (m as any).caption,
+          deleteAt: (m as any).deleteAt,
         }))
+        .filter((m) => !isExpired(m.deleteAt))
       );
+      const preferences = await getChatPreferences(chatId);
+      setDisappearingDuration(preferences.disappearingDuration || "off");
       
       for (const m of stored) {
         if (m.from !== userId && m.status !== "read") {
@@ -140,11 +162,18 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
               media,
               blocked,
               blockedMessage,
+              caption: (msg as any).caption,
+              deleteAt: (msg as any).deleteAt,
             },
           ];
         });
         setSessionStarted(false);
         if (msg.from !== userId) {
+          translateIncomingMessage(msg.text).then((translatedText) => {
+            if (!translatedText) return;
+            setMessages((prev) => prev.map((item) => item.id === msg.id ? { ...item, translatedText } : item));
+          });
+          notifyIncomingMessage(name, msg.text || (msg as any).media?.name || "New media");
           updateMessageStatus(msg.from, msg.id, "read");
         }
       }
@@ -155,6 +184,19 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const filteredMessages = useMemo(() => messages.filter((message) => !isExpired(message.deleteAt)), [messages]);
+  const searchMatches = useMemo(
+    () => filteredMessages.filter((message) => searchQuery.trim() && message.text.toLowerCase().includes(searchQuery.trim().toLowerCase())),
+    [filteredMessages, searchQuery],
+  );
+
+  useEffect(() => {
+    if (!searchMatches.length) return;
+    const current = searchMatches[Math.min(activeMatchIndex, searchMatches.length - 1)];
+    const node = messageRefs.current[current.id];
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [activeMatchIndex, searchMatches]);
 
   const sendMessage = async () => {
     if (!input.trim() || !userId) return;
@@ -168,12 +210,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       text: currentInput,
       timestamp: Date.now(),
       status: "pending",
+      deleteAt: getDeleteAt(Date.now(), disappearingDuration),
     };
 
     // БОСС: Сразу добавляем в список, чтобы не было задержки
     setMessages((prev) => [
       ...prev,
-      { id: msg.id, text: currentInput, sent: true, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), status: "pending" },
+      { id: msg.id, text: currentInput, sent: true, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), status: "pending", deleteAt: msg.deleteAt },
     ]);
     
     setInput("");
@@ -249,6 +292,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         timestamp: Date.now(),
         status: "sent",
         media,
+        deleteAt: getDeleteAt(Date.now(), disappearingDuration),
       };
 
       const peerId = `trivo-${chatId.replace(/[^a-zA-Z0-9]/g, "").substring(0, 20)}`;
@@ -266,6 +310,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           status: "sent",
           media,
+          deleteAt: msg.deleteAt,
         },
       ]);
     } catch {
@@ -277,6 +322,9 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
 
   const statusLabel = peerStatus === "online" ? t("online") : peerStatus === "away" ? t("away") : t("offline");
   const statusColor = peerStatus === "online" ? "text-primary" : peerStatus === "away" ? "text-yellow-500" : "text-muted-foreground";
+  const selectedMessages = filteredMessages.filter((message) => selectedIds.includes(message.id));
+  const allowCopy = selectedMessages.length > 0 && selectedMessages.every((message) => !!message.text && !message.media);
+  const allowMediaActions = selectedMessages.length === 1 && !!selectedMessages[0]?.media;
 
   if (callType) {
     return <CallScreen name={name} type={callType} onEnd={() => setCallType(null)} />;
@@ -322,6 +370,29 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     <div className="flex flex-col h-full max-w-[100vw] overflow-x-hidden">
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
 
+      {selectedIds.length > 0 ? (
+        <ChatSelectionBar
+          count={selectedIds.length}
+          allowCopy={allowCopy}
+          allowMediaActions={allowMediaActions}
+          onClose={() => setSelectedIds([])}
+          onCopy={async () => {
+            await navigator.clipboard.writeText(selectedMessages.map((message) => message.text).join("\n"));
+            toast({ title: "Copied" });
+            setSelectedIds([]);
+          }}
+          onForward={() => {
+            setForwardingMedia(selectedMessages[0]?.media || null);
+            setForwardSheetOpen(true);
+          }}
+          onShare={async () => {
+            const media = selectedMessages[0]?.media;
+            if (!media) return;
+            await Share.share({ title: media.name, text: selectedMessages[0]?.caption || "", url: media.url, dialogTitle: "Share media" });
+            setSelectedIds([]);
+          }}
+        />
+      ) : (
       <div className="header-safe-zone glass-panel rounded-none border-x-0 border-t-0 px-3 pb-2 header-bar-56 gap-3 z-10 shrink-0 flex items-center">
         <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-secondary/50 transition-colors shrink-0">
           <ArrowLeft size={20} className="text-foreground" />
@@ -336,15 +407,51 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         </div>
         <button onClick={() => setCallType("audio")} className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground shrink-0"><Phone size={20} /></button>
         <button onClick={() => setCallType("video")} className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground shrink-0"><Video size={20} /></button>
+        <button onClick={() => setSearchOpen((prev) => !prev)} className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground shrink-0"><Search size={18} /></button>
         <button onClick={() => setShowReport(true)} className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground shrink-0"><Flag size={18} /></button>
       </div>
+      )}
+
+      {searchOpen && (
+        <ChatSearchBar
+          value={searchQuery}
+          resultCount={searchMatches.length}
+          activeIndex={Math.min(activeMatchIndex, Math.max(searchMatches.length - 1, 0))}
+          onChange={(value) => { setSearchQuery(value); setActiveMatchIndex(0); }}
+          onNext={() => setActiveMatchIndex((prev) => searchMatches.length ? (prev + 1) % searchMatches.length : 0)}
+          onPrev={() => setActiveMatchIndex((prev) => searchMatches.length ? (prev - 1 + searchMatches.length) % searchMatches.length : 0)}
+          onClose={() => { setSearchOpen(false); setSearchQuery(""); setActiveMatchIndex(0); }}
+        />
+      )}
 
       <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 space-y-2">
-        {messages.map((msg, i) => (
+        {filteredMessages.map((msg) => {
+          const isMatch = !!searchQuery.trim() && msg.text.toLowerCase().includes(searchQuery.trim().toLowerCase());
+          const isActiveMatch = searchMatches[activeMatchIndex]?.id === msg.id;
+          const isSelected = selectedIds.includes(msg.id);
+          return (
           <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${msg.sent ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[75%] px-3.5 py-2 rounded-2xl ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md" : "glass-panel-sm rounded-bl-md"}`}>
+            <div
+              ref={(node) => { messageRefs.current[msg.id] = node; }}
+              onContextMenu={(e) => { e.preventDefault(); setSelectedIds((prev) => prev.includes(msg.id) ? prev.filter((id) => id !== msg.id) : [...prev, msg.id]); }}
+              onPointerDown={(e) => {
+                const timer = window.setTimeout(() => {
+                  setSelectedIds((prev) => prev.includes(msg.id) ? prev : [...prev, msg.id]);
+                }, 420);
+                const clear = () => window.clearTimeout(timer);
+                (e.currentTarget as HTMLDivElement).onpointerup = clear;
+                (e.currentTarget as HTMLDivElement).onpointerleave = clear;
+              }}
+              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""}`}
+            >
               {msg.media && renderMediaBubble(msg)}
               {msg.text && <p className="text-sm leading-relaxed break-words">{msg.text}</p>}
+              {msg.caption && <p className="text-sm leading-relaxed break-words mt-2">{msg.caption}</p>}
+              {msg.translatedText && !msg.sent && (
+                <div className="mt-2 rounded-xl bg-background/50 px-3 py-2 text-xs text-muted-foreground">
+                  {msg.translatedText}
+                </div>
+              )}
               <div className={`flex items-center gap-1 justify-end mt-1 ${msg.sent ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
                 <span className="text-[10px]">{msg.time}</span>
                 {msg.sent && (
@@ -356,7 +463,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
               </div>
             </div>
           </motion.div>
-        ))}
+        )})}
         <div ref={bottomRef} />
       </div>
 
@@ -375,6 +482,33 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       
       <ReportMenu userId={chatId} open={showReport} onClose={() => setShowReport(false)} />
       <SecurityScanOverlay visible={scanOverlay} onComplete={() => { setScanOverlay(false); if (pendingDownload) { window.open(pendingDownload, "_blank"); setPendingDownload(null); } }} />
+      <ForwardMediaSheet
+        open={forwardSheetOpen}
+        media={forwardingMedia}
+        onClose={() => { setForwardSheetOpen(false); setForwardingMedia(null); }}
+        onSubmit={async (targetChatId, caption) => {
+          if (!userId || !forwardingMedia) return;
+          const msgId = generateUUIDv4();
+          const payload: P2PMessage = {
+            id: msgId,
+            from: userId,
+            to: targetChatId,
+            text: "",
+            timestamp: Date.now(),
+            status: "sent",
+            media: forwardingMedia,
+            caption,
+            deleteAt: getDeleteAt(Date.now(), disappearingDuration),
+          };
+          const peerId = `trivo-${targetChatId.replace(/[^a-zA-Z0-9]/g, "").substring(0, 20)}`;
+          const sent = await sendP2PMessage(peerId, payload);
+          if (!sent) await bufferMessageInCloud(targetChatId, payload);
+          await saveChatMeta({ friendId: targetChatId, friendName: targetChatId.substring(0, 8), lastMessage: caption || forwardingMedia.name, lastMessageTime: Date.now(), unread: 0, started: true });
+          setForwardSheetOpen(false);
+          setForwardingMedia(null);
+          setSelectedIds([]);
+        }}
+      />
     </div>
   );
 };

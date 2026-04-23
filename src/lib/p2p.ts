@@ -11,6 +11,16 @@ export interface P2PMessage {
   nonce?: string;
   timestamp: number;
   status: "pending" | "sent" | "delivered" | "read";
+  media?: {
+    id: string;
+    type: "image" | "audio" | "file";
+    url: string;
+    name: string;
+    size: number;
+    mimeType: string;
+  };
+  caption?: string;
+  deleteAt?: number;
 }
 
 export interface ChatMeta {
@@ -182,6 +192,7 @@ export async function getMessagesForChat(friendId: string): Promise<P2PMessage[]
   const all = await dbGetAll<P2PMessage>("messages");
   return all
     .filter((m) => m.from === friendId || m.to === friendId)
+    .filter((m) => !m.deleteAt || m.deleteAt > Date.now())
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
