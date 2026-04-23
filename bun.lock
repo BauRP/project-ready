@@ -8,6 +8,7 @@
         "@aparajita/capacitor-biometric-auth": "5.0.0",
         "@capacitor-community/admob": "^8.0.0",
         "@capacitor-mlkit/barcode-scanning": "^8.0.1",
+        "@capacitor-mlkit/translation": "^8.0.1",
         "@capacitor/android": "^8.3.0",
         "@capacitor/cli": "^8.3.0",
         "@capacitor/core": "^8.3.0",
@@ -114,6 +115,8 @@
     "@capacitor-community/admob": ["@capacitor-community/admob@8.0.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor-community/admob/-/admob-8.0.0.tgz", { "dependencies": { "@capacitor/core": "^8.0.0", "@rdlabo/capacitor-docgen": "^0.4.1" } }, "sha512-+ZIq+UtcNvTMFwjvuhOuGvCjwK2Wu36lTIl9o1/CEjfp2Aj3m4b9zQGx0vXrERYqQmJp/Ven7ee3gGuh2Ym8nA=="],
 
     "@capacitor-mlkit/barcode-scanning": ["@capacitor-mlkit/barcode-scanning@8.0.1", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor-mlkit/barcode-scanning/-/barcode-scanning-8.0.1.tgz", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-94SyxzbcQ2HBd7yxS34dqc0PzwdOw8/98xBrjw1ioznE/Ksky/iwsip5Bm8P8Qg+dgnJYWz7NcIPjd+6bLjVoQ=="],
+
+    "@capacitor-mlkit/translation": ["@capacitor-mlkit/translation@8.0.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor-mlkit/translation/-/translation-8.0.1.tgz", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-u9N+v9zvSZvdHeVAAJKfZCfvSgpCb6mrL+lzXQauN4fHVt42T7kuJYEPX9jFXJ4ARemCVR+UueQsawG2PHNFng=="],
 
     "@capacitor/android": ["@capacitor/android@8.3.1", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor/android/-/android-8.3.1.tgz", { "peerDependencies": { "@capacitor/core": "^8.3.0" } }, "sha512-hjskIG8YcBEh3X4yaTXvE9gcqpdcxunTgFruSKnuPxtMxAUzEK4Oq25x0Z1g3cz+MQPc+lRG09R7Ovc+ydKsNw=="],
 
