@@ -4,14 +4,9 @@ import {
   getDatabase,
   ref,
   set,
-  push,
   get,
   remove,
   onValue,
-  query,
-  orderByChild,
-  equalTo,
-  serverTimestamp,
   type Database,
 } from "firebase/database";
 import gun from "./gun-setup";
@@ -200,6 +195,31 @@ export async function purgeExpiredBufferedMessages(userId: string): Promise<void
       }
     } catch {}
   }
+}
+
+export async function purgeExpiredBufferedMessagesForAllUsers(): Promise<number> {
+  if (!db) return 0;
+
+  let removedCount = 0;
+
+  try {
+    const msgRef = ref(db, "offline_messages");
+    const snapshot = await get(msgRef);
+    if (!snapshot.exists()) return 0;
+
+    const data = snapshot.val() as Record<string, Record<string, any>>;
+    await Promise.all(
+      Object.entries(data).flatMap(([recipientId, messages]) =>
+        Object.entries(messages || {}).map(async ([msgId, value]) => {
+          if (!isExpired(value?.deleteAt)) return;
+          await remove(ref(db, `offline_messages/${recipientId}/${msgId}`));
+          removedCount += 1;
+        }),
+      ),
+    );
+  } catch {}
+
+  return removedCount;
 }
 
 /**
