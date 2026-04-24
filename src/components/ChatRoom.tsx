@@ -30,6 +30,8 @@ import MessageInput from "./MessageInput";
 import ChatSelectionBar from "./ChatSelectionBar";
 import ChatSearchBar from "./ChatSearchBar";
 import ForwardMediaSheet from "./ForwardMediaSheet";
+import TranslationPlate from "./TranslationPlate";
+import AttachmentMenu from "./AttachmentMenu";
 import { getChatPreferences, getDeleteAt, isExpired } from "@/lib/chat-preferences";
 import { notifyIncomingMessage, translateIncomingMessage } from "@/lib/notifications";
 
