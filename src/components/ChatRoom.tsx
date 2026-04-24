@@ -449,8 +449,69 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const statusLabel = peerStatus === "online" ? t("online") : peerStatus === "away" ? t("away") : t("offline");
   const statusColor = peerStatus === "online" ? "text-primary" : peerStatus === "away" ? "text-yellow-500" : "text-muted-foreground";
   const selectedMessages = filteredMessages.filter((message) => selectedIds.includes(message.id));
-  const allowCopy = selectedMessages.length > 0 && selectedMessages.every((message) => !!message.text && !message.media);
+  const allowCopy = selectedMessages.length > 0 && selectedMessages.every((message) => !!getEffectiveText(message).text && !message.media);
   const allowMediaActions = selectedMessages.length === 1 && !!selectedMessages[0]?.media;
+  const singleSel = selectedMessages.length === 1 ? selectedMessages[0] : null;
+  const singleSelLifecycle = singleSel ? lifecycle[singleSel.id] : undefined;
+  // Edit only own, text-only, non-tombstone messages.
+  const allowEdit = !!singleSel && singleSel.sent && !singleSel.media && !singleSelLifecycle?.deletedForEveryone && !!getEffectiveText(singleSel).text;
+  const allowPin = !!singleSel && !singleSelLifecycle?.deletedForEveryone;
+  const isPinnedSel = !!singleSel && !!singleSelLifecycle?.pinnedAt;
+  // Delete-for-everyone only for messages I sent.
+  const allowDeleteForEveryone = selectedMessages.length > 0 && selectedMessages.every((m) => m.sent);
+
+  const handleEditStart = () => {
+    if (!singleSel) return;
+    setEditingId(singleSel.id);
+    setInput(getEffectiveText(singleSel).text);
+    setSelectedIds([]);
+    setShowEmoji(false);
+    setShowAttach(false);
+  };
+
+  const handlePinToggle = async () => {
+    if (!singleSel || !userId) return;
+    try {
+      if (singleSelLifecycle?.pinnedAt) {
+        await fsUnpinMessage(userId, chatId, singleSel.id);
+      } else {
+        await fsPinMessage(userId, chatId, singleSel.id);
+      }
+    } catch (e) {
+      console.error("[ChatRoom] pin toggle failed", e);
+    }
+    setSelectedIds([]);
+  };
+
+  const handleDeleteForMe = async () => {
+    if (!userId || selectedMessages.length === 0) return;
+    try {
+      await Promise.all(
+        selectedMessages.map((m) => fsDeleteForMe(userId, chatId, m.id)),
+      );
+    } catch (e) {
+      console.error("[ChatRoom] delete for me failed", e);
+    }
+    setSelectedIds([]);
+  };
+
+  const handleDeleteForEveryone = async () => {
+    if (!userId || selectedMessages.length === 0) return;
+    try {
+      await Promise.all(
+        selectedMessages.map((m) => fsDeleteForEveryone(userId, chatId, m.id)),
+      );
+    } catch (e) {
+      console.error("[ChatRoom] delete for everyone failed", e);
+    }
+    setSelectedIds([]);
+  };
+
+  const jumpToMessage = (id: string) => {
+    const node = messageRefs.current[id];
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
 
   if (callType) {
     return <CallScreen name={name} type={callType} onEnd={() => setCallType(null)} />;
