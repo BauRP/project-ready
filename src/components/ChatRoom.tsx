@@ -619,6 +619,18 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         />
       )}
 
+      <AnimatePresence>
+        {pinnedMessage && pinnedMessageId && (
+          <PinnedHeader
+            key={pinnedMessageId}
+            preview={pinnedPreview}
+            label={t("pinnedMessage")}
+            onJump={() => jumpToMessage(pinnedMessageId)}
+            onUnpin={() => userId && fsUnpinMessage(userId, chatId, pinnedMessageId).catch(() => {})}
+          />
+        )}
+      </AnimatePresence>
+
       <div
         className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 space-y-2"
         onClick={() => {
