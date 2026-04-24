@@ -213,7 +213,9 @@
     top: var(--app-top-offset);
     transition: top 0.2s ease-in-out;
   }
-  /* Edge-to-edge ad container reset — kills any inherited max-width / padding. */
+  /* Edge-to-edge ad container reset — kills any inherited max-width / padding.
+     Hard-clipped overflow + contain layout prevents the SDK from triggering reflows
+     in the parent app shell when the CAB header swaps in. */
   .ad-banner-container {
     max-width: none !important;
     width: 100vw !important;
@@ -221,6 +223,8 @@
     margin-right: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
+    overflow: hidden !important;
+    contain: layout size style !important;
   }
   .safe-pb {
     padding-bottom: env(safe-area-inset-bottom, 0px);
