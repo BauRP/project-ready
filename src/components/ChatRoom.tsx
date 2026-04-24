@@ -698,6 +698,33 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         <div ref={bottomRef} />
       </div>
 
+      <AnimatePresence>
+        {editingId && (
+          <motion.div
+            key="edit-banner"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.15 }}
+            className="glass-panel rounded-none border-x-0 border-b-0 px-3 py-2 flex items-center gap-2 shrink-0"
+          >
+            <Pin size={14} className="text-primary rotate-45" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">{t("editMessage")}</p>
+              <p className="text-xs text-muted-foreground truncate">{input}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setEditingId(null); setInput(""); }}
+              className="p-1.5 rounded-md hover:bg-secondary/50 text-muted-foreground"
+              aria-label={t("cancelEdit")}
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <MessageInput
         value={input}
         onValueChange={setInput}
