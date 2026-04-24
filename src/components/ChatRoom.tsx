@@ -562,9 +562,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           count={selectedIds.length}
           allowCopy={allowCopy}
           allowMediaActions={allowMediaActions}
+          allowEdit={allowEdit}
+          allowPin={allowPin}
+          isPinned={isPinnedSel}
+          allowDeleteForEveryone={allowDeleteForEveryone}
           onClose={() => setSelectedIds([])}
           onCopy={async () => {
-            await navigator.clipboard.writeText(selectedMessages.map((message) => message.text).join("\n"));
+            await navigator.clipboard.writeText(selectedMessages.map((message) => getEffectiveText(message).text).join("\n"));
             toast({ title: "Copied" });
             setSelectedIds([]);
           }}
@@ -578,6 +582,10 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
             await Share.share({ title: media.name, text: selectedMessages[0]?.caption || "", url: media.url, dialogTitle: "Share media" });
             setSelectedIds([]);
           }}
+          onEdit={handleEditStart}
+          onPinToggle={handlePinToggle}
+          onDeleteForMe={handleDeleteForMe}
+          onDeleteForEveryone={handleDeleteForEveryone}
         />
       ) : (
       <div className="header-safe-zone glass-panel rounded-none border-x-0 border-t-0 px-3 pb-2 header-bar-56 gap-3 z-10 shrink-0 flex items-center">
@@ -621,9 +629,11 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       >
         <AnimatePresence initial={false}>
         {filteredMessages.map((msg) => {
-          const isMatch = !!searchQuery.trim() && msg.text.toLowerCase().includes(searchQuery.trim().toLowerCase());
+          const eff = getEffectiveText(msg);
+          const isMatch = !!searchQuery.trim() && eff.text.toLowerCase().includes(searchQuery.trim().toLowerCase());
           const isActiveMatch = searchMatches[activeMatchIndex]?.id === msg.id;
           const isSelected = selectedIds.includes(msg.id);
+          const isPinnedHere = pinnedMessageId === msg.id;
           return (
           <motion.div
             key={msg.id}
@@ -646,17 +656,23 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
                 (e.currentTarget as HTMLDivElement).onpointerup = clear;
                 (e.currentTarget as HTMLDivElement).onpointerleave = clear;
               }}
-              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border flex flex-col ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""}`}
+              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border flex flex-col ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""} ${eff.isTombstone ? "opacity-70 italic" : ""}`}
             >
-              {msg.media && renderMediaBubble(msg)}
-              {msg.text && <p className="text-sm leading-relaxed break-words">{msg.text}</p>}
-              {msg.caption && <p className="text-sm leading-relaxed break-words mt-2">{msg.caption}</p>}
-              {msg.translatedText && !msg.sent && (
+              {msg.media && !eff.isTombstone && renderMediaBubble(msg)}
+              {eff.text && <p className="text-sm leading-relaxed break-words">{eff.text}</p>}
+              {msg.caption && !eff.isTombstone && <p className="text-sm leading-relaxed break-words mt-2">{msg.caption}</p>}
+              {msg.translatedText && !msg.sent && !eff.isTombstone && (
                 <TranslationPlate translatedText={msg.translatedText} sent={msg.sent} />
               )}
               <div className={`flex items-center gap-1 justify-end mt-1 ${msg.sent ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                {isPinnedHere && !eff.isTombstone && (
+                  <Pin size={10} className={msg.sent ? "text-primary-foreground/70" : "text-primary"} />
+                )}
+                {eff.isEdited && (
+                  <span className="text-[10px] italic">{t("edited")}</span>
+                )}
                 <span className="text-[10px]">{msg.time}</span>
-                {msg.sent && (
+                {msg.sent && !eff.isTombstone && (
                   msg.status === "pending" ? <Clock size={11} className="animate-pulse" /> :
                   msg.status === "sent" ? <Check size={12} /> :
                   msg.status === "delivered" ? <CheckCheck size={12} /> :
