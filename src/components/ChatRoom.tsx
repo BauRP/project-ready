@@ -109,6 +109,15 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     setMessages((prev) => prev.map((message) => translated.find((item) => item.id === message.id) || message));
   };
 
+  // Firestore lifecycle (edit / delete / pin) — source of truth
+  useEffect(() => {
+    if (!userId || !chatId) return;
+    const unsub = subscribeLifecycle(userId, chatId, (map) => {
+      setLifecycle(map);
+    });
+    return unsub;
+  }, [userId, chatId]);
+
   // Presence subscription
   useEffect(() => {
     setPeerStatus(getPresenceStatus(chatId));
