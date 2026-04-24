@@ -311,7 +311,22 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
 
   const sendMessage = async () => {
     if (!input.trim() || !userId) return;
-    
+
+    // ── Edit mode: write the new text to Firestore lifecycle and exit edit mode.
+    if (editingId) {
+      const newText = input.trim();
+      try {
+        await fsEditMessage(userId, chatId, editingId, newText);
+        toast({ title: t("edited") });
+      } catch (e) {
+        console.error("[ChatRoom] edit failed", e);
+      }
+      setInput("");
+      setEditingId(null);
+      setSelectedIds([]);
+      return;
+    }
+
     const msgId = generateUUIDv4();
     const currentInput = input;
     const msg: P2PMessage = {
