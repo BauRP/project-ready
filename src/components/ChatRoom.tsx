@@ -1,5 +1,5 @@
-import { ArrowLeft, FileText, Check, CheckCheck, Phone, Video, Flag, Download, Clock, ShieldAlert, Search } from "lucide-react";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { ArrowLeft, FileText, Check, CheckCheck, Phone, Video, Flag, Download, Clock, ShieldAlert, Search, Pin, X } from "lucide-react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import { Share } from "@capacitor/share";
@@ -24,6 +24,15 @@ import {
   type P2PMessage,
 } from "@/lib/p2p";
 import { bufferMessageInCloud, updateMessageStatus, listenForStatusUpdates } from "@/lib/firebase-sync";
+import {
+  subscribeLifecycle,
+  editMessage as fsEditMessage,
+  deleteMessageForMe as fsDeleteForMe,
+  deleteMessageForEveryone as fsDeleteForEveryone,
+  pinMessage as fsPinMessage,
+  unpinMessage as fsUnpinMessage,
+  type MessageLifecycle,
+} from "@/lib/firestore-messages";
 import AudioWaveformPlayer from "./AudioWaveformPlayer";
 import SecurityScanOverlay from "./SecurityScanOverlay";
 import MessageInput from "./MessageInput";
@@ -32,6 +41,7 @@ import ChatSearchBar from "./ChatSearchBar";
 import ForwardMediaSheet from "./ForwardMediaSheet";
 import TranslationPlate from "./TranslationPlate";
 import AttachmentMenu from "./AttachmentMenu";
+import PinnedHeader from "./PinnedHeader";
 import { getChatPreferences, getDeleteAt, isExpired } from "@/lib/chat-preferences";
 import { notifyIncomingMessage, translateIncomingMessage } from "@/lib/notifications";
 
@@ -75,6 +85,8 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const [forwardingMedia, setForwardingMedia] = useState<MediaAttachment | null>(null);
   const [forwardSheetOpen, setForwardSheetOpen] = useState(false);
   const [disappearingDuration, setDisappearingDuration] = useState<"1h" | "6h" | "12h" | "24h" | "off">("off");
+  const [lifecycle, setLifecycle] = useState<Record<string, MessageLifecycle>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -96,6 +108,15 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
 
     setMessages((prev) => prev.map((message) => translated.find((item) => item.id === message.id) || message));
   };
+
+  // Firestore lifecycle (edit / delete / pin) — source of truth
+  useEffect(() => {
+    if (!userId || !chatId) return;
+    const unsub = subscribeLifecycle(userId, chatId, (map) => {
+      setLifecycle(map);
+    });
+    return unsub;
+  }, [userId, chatId]);
 
   // Presence subscription
   useEffect(() => {
@@ -219,10 +240,66 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const filteredMessages = useMemo(() => messages.filter((message) => !isExpired(message.deleteAt)), [messages]);
+  // Apply lifecycle: hide deleted-for-me, mark deleted-for-everyone as tombstones, override text on edit.
+  const visibleMessages = useMemo(() => {
+    return messages
+      .filter((message) => !isExpired(message.deleteAt))
+      .filter((message) => {
+        const lc = lifecycle[message.id];
+        if (!lc) return true;
+        if (userId && lc.deletedFor?.includes(userId)) return false;
+        return true;
+      });
+  }, [messages, lifecycle, userId]);
+
+  const getEffectiveText = useCallback(
+    (msg: Message): { text: string; isEdited: boolean; isTombstone: boolean } => {
+      const lc = lifecycle[msg.id];
+      if (lc?.deletedForEveryone) {
+        return { text: t("messageDeleted"), isEdited: false, isTombstone: true };
+      }
+      if (lc?.isEdited && typeof lc.editedText === "string") {
+        return { text: lc.editedText, isEdited: true, isTombstone: false };
+      }
+      return { text: msg.text, isEdited: false, isTombstone: false };
+    },
+    [lifecycle, t],
+  );
+
+  const pinnedMessageId = useMemo(() => {
+    let bestId: string | null = null;
+    let bestAt = 0;
+    for (const [id, lc] of Object.entries(lifecycle)) {
+      if (lc.pinnedAt && lc.pinnedAt > bestAt && !lc.deletedForEveryone) {
+        // Only show pin if message is still visible to this user
+        const exists = messages.some((m) => m.id === id);
+        const hiddenForMe = userId ? lc.deletedFor?.includes(userId) : false;
+        if (exists && !hiddenForMe) {
+          bestId = id;
+          bestAt = lc.pinnedAt;
+        }
+      }
+    }
+    return bestId;
+  }, [lifecycle, messages, userId]);
+
+  const pinnedMessage = pinnedMessageId ? messages.find((m) => m.id === pinnedMessageId) : null;
+  const pinnedPreview = pinnedMessage
+    ? (() => {
+        const eff = getEffectiveText(pinnedMessage);
+        if (eff.text) return eff.text;
+        if (pinnedMessage.media) return pinnedMessage.media.name || "Media";
+        return "Message";
+      })()
+    : "";
+
+  const filteredMessages = visibleMessages;
   const searchMatches = useMemo(
-    () => filteredMessages.filter((message) => searchQuery.trim() && message.text.toLowerCase().includes(searchQuery.trim().toLowerCase())),
-    [filteredMessages, searchQuery],
+    () =>
+      filteredMessages.filter(
+        (message) => searchQuery.trim() && getEffectiveText(message).text.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+      ),
+    [filteredMessages, searchQuery, getEffectiveText],
   );
 
   useEffect(() => {
@@ -234,7 +311,22 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
 
   const sendMessage = async () => {
     if (!input.trim() || !userId) return;
-    
+
+    // ── Edit mode: write the new text to Firestore lifecycle and exit edit mode.
+    if (editingId) {
+      const newText = input.trim();
+      try {
+        await fsEditMessage(userId, chatId, editingId, newText);
+        toast({ title: t("edited") });
+      } catch (e) {
+        console.error("[ChatRoom] edit failed", e);
+      }
+      setInput("");
+      setEditingId(null);
+      setSelectedIds([]);
+      return;
+    }
+
     const msgId = generateUUIDv4();
     const currentInput = input;
     const msg: P2PMessage = {
@@ -357,8 +449,69 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const statusLabel = peerStatus === "online" ? t("online") : peerStatus === "away" ? t("away") : t("offline");
   const statusColor = peerStatus === "online" ? "text-primary" : peerStatus === "away" ? "text-yellow-500" : "text-muted-foreground";
   const selectedMessages = filteredMessages.filter((message) => selectedIds.includes(message.id));
-  const allowCopy = selectedMessages.length > 0 && selectedMessages.every((message) => !!message.text && !message.media);
+  const allowCopy = selectedMessages.length > 0 && selectedMessages.every((message) => !!getEffectiveText(message).text && !message.media);
   const allowMediaActions = selectedMessages.length === 1 && !!selectedMessages[0]?.media;
+  const singleSel = selectedMessages.length === 1 ? selectedMessages[0] : null;
+  const singleSelLifecycle = singleSel ? lifecycle[singleSel.id] : undefined;
+  // Edit only own, text-only, non-tombstone messages.
+  const allowEdit = !!singleSel && singleSel.sent && !singleSel.media && !singleSelLifecycle?.deletedForEveryone && !!getEffectiveText(singleSel).text;
+  const allowPin = !!singleSel && !singleSelLifecycle?.deletedForEveryone;
+  const isPinnedSel = !!singleSel && !!singleSelLifecycle?.pinnedAt;
+  // Delete-for-everyone only for messages I sent.
+  const allowDeleteForEveryone = selectedMessages.length > 0 && selectedMessages.every((m) => m.sent);
+
+  const handleEditStart = () => {
+    if (!singleSel) return;
+    setEditingId(singleSel.id);
+    setInput(getEffectiveText(singleSel).text);
+    setSelectedIds([]);
+    setShowEmoji(false);
+    setShowAttach(false);
+  };
+
+  const handlePinToggle = async () => {
+    if (!singleSel || !userId) return;
+    try {
+      if (singleSelLifecycle?.pinnedAt) {
+        await fsUnpinMessage(userId, chatId, singleSel.id);
+      } else {
+        await fsPinMessage(userId, chatId, singleSel.id);
+      }
+    } catch (e) {
+      console.error("[ChatRoom] pin toggle failed", e);
+    }
+    setSelectedIds([]);
+  };
+
+  const handleDeleteForMe = async () => {
+    if (!userId || selectedMessages.length === 0) return;
+    try {
+      await Promise.all(
+        selectedMessages.map((m) => fsDeleteForMe(userId, chatId, m.id)),
+      );
+    } catch (e) {
+      console.error("[ChatRoom] delete for me failed", e);
+    }
+    setSelectedIds([]);
+  };
+
+  const handleDeleteForEveryone = async () => {
+    if (!userId || selectedMessages.length === 0) return;
+    try {
+      await Promise.all(
+        selectedMessages.map((m) => fsDeleteForEveryone(userId, chatId, m.id)),
+      );
+    } catch (e) {
+      console.error("[ChatRoom] delete for everyone failed", e);
+    }
+    setSelectedIds([]);
+  };
+
+  const jumpToMessage = (id: string) => {
+    const node = messageRefs.current[id];
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
 
   if (callType) {
     return <CallScreen name={name} type={callType} onEnd={() => setCallType(null)} />;
@@ -409,9 +562,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           count={selectedIds.length}
           allowCopy={allowCopy}
           allowMediaActions={allowMediaActions}
+          allowEdit={allowEdit}
+          allowPin={allowPin}
+          isPinned={isPinnedSel}
+          allowDeleteForEveryone={allowDeleteForEveryone}
           onClose={() => setSelectedIds([])}
           onCopy={async () => {
-            await navigator.clipboard.writeText(selectedMessages.map((message) => message.text).join("\n"));
+            await navigator.clipboard.writeText(selectedMessages.map((message) => getEffectiveText(message).text).join("\n"));
             toast({ title: "Copied" });
             setSelectedIds([]);
           }}
@@ -425,6 +582,10 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
             await Share.share({ title: media.name, text: selectedMessages[0]?.caption || "", url: media.url, dialogTitle: "Share media" });
             setSelectedIds([]);
           }}
+          onEdit={handleEditStart}
+          onPinToggle={handlePinToggle}
+          onDeleteForMe={handleDeleteForMe}
+          onDeleteForEveryone={handleDeleteForEveryone}
         />
       ) : (
       <div className="header-safe-zone glass-panel rounded-none border-x-0 border-t-0 px-3 pb-2 header-bar-56 gap-3 z-10 shrink-0 flex items-center">
@@ -458,6 +619,18 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         />
       )}
 
+      <AnimatePresence>
+        {pinnedMessage && pinnedMessageId && (
+          <PinnedHeader
+            key={pinnedMessageId}
+            preview={pinnedPreview}
+            label={t("pinnedMessage")}
+            onJump={() => jumpToMessage(pinnedMessageId)}
+            onUnpin={() => userId && fsUnpinMessage(userId, chatId, pinnedMessageId).catch(() => {})}
+          />
+        )}
+      </AnimatePresence>
+
       <div
         className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 space-y-2"
         onClick={() => {
@@ -468,9 +641,11 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       >
         <AnimatePresence initial={false}>
         {filteredMessages.map((msg) => {
-          const isMatch = !!searchQuery.trim() && msg.text.toLowerCase().includes(searchQuery.trim().toLowerCase());
+          const eff = getEffectiveText(msg);
+          const isMatch = !!searchQuery.trim() && eff.text.toLowerCase().includes(searchQuery.trim().toLowerCase());
           const isActiveMatch = searchMatches[activeMatchIndex]?.id === msg.id;
           const isSelected = selectedIds.includes(msg.id);
+          const isPinnedHere = pinnedMessageId === msg.id;
           return (
           <motion.div
             key={msg.id}
@@ -493,17 +668,23 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
                 (e.currentTarget as HTMLDivElement).onpointerup = clear;
                 (e.currentTarget as HTMLDivElement).onpointerleave = clear;
               }}
-              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border flex flex-col ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""}`}
+              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border flex flex-col ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""} ${eff.isTombstone ? "opacity-70 italic" : ""}`}
             >
-              {msg.media && renderMediaBubble(msg)}
-              {msg.text && <p className="text-sm leading-relaxed break-words">{msg.text}</p>}
-              {msg.caption && <p className="text-sm leading-relaxed break-words mt-2">{msg.caption}</p>}
-              {msg.translatedText && !msg.sent && (
+              {msg.media && !eff.isTombstone && renderMediaBubble(msg)}
+              {eff.text && <p className="text-sm leading-relaxed break-words">{eff.text}</p>}
+              {msg.caption && !eff.isTombstone && <p className="text-sm leading-relaxed break-words mt-2">{msg.caption}</p>}
+              {msg.translatedText && !msg.sent && !eff.isTombstone && (
                 <TranslationPlate translatedText={msg.translatedText} sent={msg.sent} />
               )}
               <div className={`flex items-center gap-1 justify-end mt-1 ${msg.sent ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                {isPinnedHere && !eff.isTombstone && (
+                  <Pin size={10} className={msg.sent ? "text-primary-foreground/70" : "text-primary"} />
+                )}
+                {eff.isEdited && (
+                  <span className="text-[10px] italic">{t("edited")}</span>
+                )}
                 <span className="text-[10px]">{msg.time}</span>
-                {msg.sent && (
+                {msg.sent && !eff.isTombstone && (
                   msg.status === "pending" ? <Clock size={11} className="animate-pulse" /> :
                   msg.status === "sent" ? <Check size={12} /> :
                   msg.status === "delivered" ? <CheckCheck size={12} /> :
@@ -516,6 +697,33 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         </AnimatePresence>
         <div ref={bottomRef} />
       </div>
+
+      <AnimatePresence>
+        {editingId && (
+          <motion.div
+            key="edit-banner"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.15 }}
+            className="glass-panel rounded-none border-x-0 border-b-0 px-3 py-2 flex items-center gap-2 shrink-0"
+          >
+            <Pin size={14} className="text-primary rotate-45" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">{t("editMessage")}</p>
+              <p className="text-xs text-muted-foreground truncate">{input}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setEditingId(null); setInput(""); }}
+              className="p-1.5 rounded-md hover:bg-secondary/50 text-muted-foreground"
+              aria-label={t("cancelEdit")}
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <MessageInput
         value={input}

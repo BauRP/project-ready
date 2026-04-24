@@ -120,7 +120,19 @@ export type TranslationKey =
   | "mediaUploadFailed"
   | "uploading"
   | "disappearingMessages"
-  | "translationSettings";
+  | "translationSettings"
+  | "edit"
+  | "edited"
+  | "editMessage"
+  | "saveEdit"
+  | "cancelEdit"
+  | "deleteForMe"
+  | "deleteForEveryone"
+  | "messageDeleted"
+  | "pin"
+  | "unpin"
+  | "pinned"
+  | "pinnedMessage";
 
 type TranslationMap = Partial<Record<TranslationKey, string>>;
 
@@ -247,6 +259,18 @@ const en: TranslationMap = {
   uploading: "Uploading...",
   disappearingMessages: "Disappearing Messages",
   translationSettings: "Translation Settings",
+  edit: "Edit",
+  edited: "edited",
+  editMessage: "Edit message",
+  saveEdit: "Save",
+  cancelEdit: "Cancel",
+  deleteForMe: "Delete for me",
+  deleteForEveryone: "Delete for everyone",
+  messageDeleted: "This message was deleted",
+  pin: "Pin",
+  unpin: "Unpin",
+  pinned: "Pinned",
+  pinnedMessage: "Pinned message",
 };
 
 const ru: TranslationMap = {
@@ -372,6 +396,18 @@ const ru: TranslationMap = {
   translationSettings: "Настройки перевода",
   mediaUploadFailed: "Ошибка загрузки",
   uploading: "Загрузка...",
+  edit: "Изменить",
+  edited: "изменено",
+  editMessage: "Редактировать сообщение",
+  saveEdit: "Сохранить",
+  cancelEdit: "Отмена",
+  deleteForMe: "Удалить у меня",
+  deleteForEveryone: "Удалить у всех",
+  messageDeleted: "Сообщение удалено",
+  pin: "Закрепить",
+  unpin: "Открепить",
+  pinned: "Закреплено",
+  pinnedMessage: "Закреплённое сообщение",
 };
 
 const kk: TranslationMap = {
@@ -494,6 +530,18 @@ const kk: TranslationMap = {
   mediaUploaded: "Медиа жіберілді",
   mediaUploadFailed: "Жүктеу сәтсіз",
   uploading: "Жүктелуде...",
+  edit: "Өңдеу",
+  edited: "өңделген",
+  editMessage: "Хабарды өңдеу",
+  saveEdit: "Сақтау",
+  cancelEdit: "Болдырмау",
+  deleteForMe: "Өзімде жою",
+  deleteForEveryone: "Барлығында жою",
+  messageDeleted: "Хабар жойылды",
+  pin: "Бекіту",
+  unpin: "Босату",
+  pinned: "Бекітілген",
+  pinnedMessage: "Бекітілген хабар",
 };
 
 const es: TranslationMap = {
@@ -616,6 +664,18 @@ const es: TranslationMap = {
   mediaUploaded: "Media enviado",
   mediaUploadFailed: "Error al subir",
   uploading: "Subiendo...",
+  edit: "Editar",
+  edited: "editado",
+  editMessage: "Editar mensaje",
+  saveEdit: "Guardar",
+  cancelEdit: "Cancelar",
+  deleteForMe: "Eliminar para mí",
+  deleteForEveryone: "Eliminar para todos",
+  messageDeleted: "Mensaje eliminado",
+  pin: "Anclar",
+  unpin: "Desanclar",
+  pinned: "Anclado",
+  pinnedMessage: "Mensaje anclado",
 };
 
 const fr: TranslationMap = {
@@ -738,6 +798,18 @@ const fr: TranslationMap = {
   mediaUploaded: "Média envoyé",
   mediaUploadFailed: "Échec du téléchargement",
   uploading: "Chargement...",
+  edit: "Modifier",
+  edited: "modifié",
+  editMessage: "Modifier le message",
+  saveEdit: "Enregistrer",
+  cancelEdit: "Annuler",
+  deleteForMe: "Supprimer pour moi",
+  deleteForEveryone: "Supprimer pour tous",
+  messageDeleted: "Message supprimé",
+  pin: "Épingler",
+  unpin: "Détacher",
+  pinned: "Épinglé",
+  pinnedMessage: "Message épinglé",
 };
 
 const de: TranslationMap = {
@@ -860,6 +932,18 @@ const de: TranslationMap = {
   mediaUploaded: "Medien gesendet",
   mediaUploadFailed: "Upload fehlgeschlagen",
   uploading: "Wird hochgeladen...",
+  edit: "Bearbeiten",
+  edited: "bearbeitet",
+  editMessage: "Nachricht bearbeiten",
+  saveEdit: "Speichern",
+  cancelEdit: "Abbrechen",
+  deleteForMe: "Für mich löschen",
+  deleteForEveryone: "Für alle löschen",
+  messageDeleted: "Nachricht gelöscht",
+  pin: "Anpinnen",
+  unpin: "Lösen",
+  pinned: "Angepinnt",
+  pinnedMessage: "Angepinnte Nachricht",
 };
 
 const ja: TranslationMap = {
@@ -982,6 +1066,18 @@ const ja: TranslationMap = {
   mediaUploaded: "メディア送信済み",
   mediaUploadFailed: "アップロード失敗",
   uploading: "アップロード中...",
+  edit: "編集",
+  edited: "編集済み",
+  editMessage: "メッセージを編集",
+  saveEdit: "保存",
+  cancelEdit: "キャンセル",
+  deleteForMe: "自分から削除",
+  deleteForEveryone: "全員から削除",
+  messageDeleted: "このメッセージは削除されました",
+  pin: "ピン留め",
+  unpin: "ピン解除",
+  pinned: "ピン留め済み",
+  pinnedMessage: "ピン留めメッセージ",
 };
 
 const zh: TranslationMap = {
@@ -1104,6 +1200,18 @@ const zh: TranslationMap = {
   mediaUploaded: "媒体已发送",
   mediaUploadFailed: "上传失败",
   uploading: "上传中...",
+  edit: "编辑",
+  edited: "已编辑",
+  editMessage: "编辑消息",
+  saveEdit: "保存",
+  cancelEdit: "取消",
+  deleteForMe: "为我删除",
+  deleteForEveryone: "为所有人删除",
+  messageDeleted: "此消息已删除",
+  pin: "置顶",
+  unpin: "取消置顶",
+  pinned: "已置顶",
+  pinnedMessage: "置顶消息",
 };
 
 const ar: TranslationMap = {
@@ -1226,6 +1334,18 @@ const ar: TranslationMap = {
   mediaUploaded: "تم إرسال الوسائط",
   mediaUploadFailed: "فشل التحميل",
   uploading: "جاري التحميل...",
+  edit: "تعديل",
+  edited: "معدّل",
+  editMessage: "تعديل الرسالة",
+  saveEdit: "حفظ",
+  cancelEdit: "إلغاء",
+  deleteForMe: "حذف لدي",
+  deleteForEveryone: "حذف للجميع",
+  messageDeleted: "تم حذف هذه الرسالة",
+  pin: "تثبيت",
+  unpin: "إلغاء التثبيت",
+  pinned: "مثبتة",
+  pinnedMessage: "رسالة مثبتة",
 };
 
 const hi: TranslationMap = {
@@ -1348,6 +1468,18 @@ const hi: TranslationMap = {
   mediaUploaded: "मीडिया भेजा गया",
   mediaUploadFailed: "अपलोड विफल",
   uploading: "अपलोड हो रहा है...",
+  edit: "संपादित करें",
+  edited: "संपादित",
+  editMessage: "संदेश संपादित करें",
+  saveEdit: "सहेजें",
+  cancelEdit: "रद्द करें",
+  deleteForMe: "मेरे लिए हटाएँ",
+  deleteForEveryone: "सभी के लिए हटाएँ",
+  messageDeleted: "यह संदेश हटा दिया गया",
+  pin: "पिन करें",
+  unpin: "अनपिन करें",
+  pinned: "पिन किया",
+  pinnedMessage: "पिन किया गया संदेश",
 };
 
 const pt: TranslationMap = {
@@ -1470,6 +1602,18 @@ const pt: TranslationMap = {
   mediaUploaded: "Mídia enviada",
   mediaUploadFailed: "Falha no upload",
   uploading: "Enviando...",
+  edit: "Editar",
+  edited: "editada",
+  editMessage: "Editar mensagem",
+  saveEdit: "Salvar",
+  cancelEdit: "Cancelar",
+  deleteForMe: "Excluir para mim",
+  deleteForEveryone: "Excluir para todos",
+  messageDeleted: "Mensagem excluída",
+  pin: "Fixar",
+  unpin: "Desafixar",
+  pinned: "Fixada",
+  pinnedMessage: "Mensagem fixada",
 };
 
 const tr: TranslationMap = {
@@ -1592,6 +1736,18 @@ const tr: TranslationMap = {
   mediaUploaded: "Medya gönderildi",
   mediaUploadFailed: "Yükleme başarısız",
   uploading: "Yükleniyor...",
+  edit: "Düzenle",
+  edited: "düzenlendi",
+  editMessage: "Mesajı düzenle",
+  saveEdit: "Kaydet",
+  cancelEdit: "İptal",
+  deleteForMe: "Benden sil",
+  deleteForEveryone: "Herkesten sil",
+  messageDeleted: "Bu mesaj silindi",
+  pin: "Sabitle",
+  unpin: "Sabitlemeyi kaldır",
+  pinned: "Sabitlenmiş",
+  pinnedMessage: "Sabitlenmiş mesaj",
 };
 
 const ko: TranslationMap = {
@@ -1714,6 +1870,18 @@ const ko: TranslationMap = {
   mediaUploaded: "미디어 전송됨",
   mediaUploadFailed: "업로드 실패",
   uploading: "업로드 중...",
+  edit: "수정",
+  edited: "수정됨",
+  editMessage: "메시지 수정",
+  saveEdit: "저장",
+  cancelEdit: "취소",
+  deleteForMe: "나에게서 삭제",
+  deleteForEveryone: "모두에게서 삭제",
+  messageDeleted: "이 메시지는 삭제되었습니다",
+  pin: "고정",
+  unpin: "고정 해제",
+  pinned: "고정됨",
+  pinnedMessage: "고정된 메시지",
 };
 
 const it: TranslationMap = {
@@ -1836,6 +2004,18 @@ const it: TranslationMap = {
   mediaUploaded: "Media inviato",
   mediaUploadFailed: "Caricamento fallito",
   uploading: "Caricamento...",
+  edit: "Modifica",
+  edited: "modificato",
+  editMessage: "Modifica messaggio",
+  saveEdit: "Salva",
+  cancelEdit: "Annulla",
+  deleteForMe: "Elimina per me",
+  deleteForEveryone: "Elimina per tutti",
+  messageDeleted: "Messaggio eliminato",
+  pin: "Fissa",
+  unpin: "Rimuovi",
+  pinned: "Fissato",
+  pinnedMessage: "Messaggio fissato",
 };
 
 const nl: TranslationMap = {
@@ -1958,6 +2138,18 @@ const nl: TranslationMap = {
   mediaUploaded: "Media verzonden",
   mediaUploadFailed: "Upload mislukt",
   uploading: "Uploaden...",
+  edit: "Bewerken",
+  edited: "bewerkt",
+  editMessage: "Bericht bewerken",
+  saveEdit: "Opslaan",
+  cancelEdit: "Annuleren",
+  deleteForMe: "Verwijderen voor mij",
+  deleteForEveryone: "Verwijderen voor iedereen",
+  messageDeleted: "Bericht verwijderd",
+  pin: "Vastmaken",
+  unpin: "Losmaken",
+  pinned: "Vastgemaakt",
+  pinnedMessage: "Vastgemaakt bericht",
 };
 
 export const translations: Record<string, TranslationMap> = {
