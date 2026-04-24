@@ -1,4 +1,4 @@
-import { Copy, UserPlus, Check, Clock } from "lucide-react";
+import { Copy, UserPlus, Check, Clock, ShieldAlert } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -189,6 +189,21 @@ const AddFriend = () => {
               <span className="text-[11px] text-yellow-500">Pending — request will sync when they come online</span>
             </div>
           )}
+        </motion.div>
+
+        {/* Security Advisory */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+          className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 flex items-start gap-3"
+          role="note"
+          aria-label="Security notice"
+        >
+          <ShieldAlert size={16} className="text-yellow-500 shrink-0 mt-0.5" />
+          <p className="text-[12.5px] leading-relaxed text-foreground/90">
+            {t("securityNotice")}
+          </p>
         </motion.div>
       </div>
 
