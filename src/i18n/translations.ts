@@ -104,6 +104,7 @@ export type TranslationKey =
   | "invalidIdFormat"
   | "cannotAddSelf"
   | "shareIdDesc"
+  | "securityNotice"
   | "addPeerById"
   | "unblockRestore"
   | "unblockRestoreDesc"
