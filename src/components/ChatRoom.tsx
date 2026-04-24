@@ -458,14 +458,31 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         />
       )}
 
-      <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 space-y-2">
+      <div
+        className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 space-y-2"
+        onClick={() => {
+          // Click-away dismissal: tapping the chat background closes the emoji picker.
+          if (showEmoji) setShowEmoji(false);
+          if (showAttach) setShowAttach(false);
+        }}
+      >
+        <AnimatePresence initial={false}>
         {filteredMessages.map((msg) => {
           const isMatch = !!searchQuery.trim() && msg.text.toLowerCase().includes(searchQuery.trim().toLowerCase());
           const isActiveMatch = searchMatches[activeMatchIndex]?.id === msg.id;
           const isSelected = selectedIds.includes(msg.id);
           return (
-          <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${msg.sent ? "justify-end" : "justify-start"}`}>
-            <div
+          <motion.div
+            key={msg.id}
+            layout
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+            className={`flex ${msg.sent ? "justify-end" : "justify-start"}`}
+          >
+            <motion.div
+              layout
               ref={(node) => { messageRefs.current[msg.id] = node; }}
               onContextMenu={(e) => { e.preventDefault(); setSelectedIds((prev) => prev.includes(msg.id) ? prev.filter((id) => id !== msg.id) : [...prev, msg.id]); }}
               onPointerDown={(e) => {
@@ -476,28 +493,27 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
                 (e.currentTarget as HTMLDivElement).onpointerup = clear;
                 (e.currentTarget as HTMLDivElement).onpointerleave = clear;
               }}
-              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""}`}
+              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border flex flex-col ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""}`}
             >
               {msg.media && renderMediaBubble(msg)}
               {msg.text && <p className="text-sm leading-relaxed break-words">{msg.text}</p>}
               {msg.caption && <p className="text-sm leading-relaxed break-words mt-2">{msg.caption}</p>}
               {msg.translatedText && !msg.sent && (
-                <div className="mt-2 rounded-xl bg-background/50 px-3 py-2 text-xs text-muted-foreground">
-                  {msg.translatedText}
-                </div>
+                <TranslationPlate translatedText={msg.translatedText} sent={msg.sent} />
               )}
               <div className={`flex items-center gap-1 justify-end mt-1 ${msg.sent ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
                 <span className="text-[10px]">{msg.time}</span>
                 {msg.sent && (
-                  msg.status === "pending" ? <Clock size={11} className="animate-pulse" /> : 
-                  msg.status === "sent" ? <Check size={12} /> : 
-                  msg.status === "delivered" ? <CheckCheck size={12} /> : 
+                  msg.status === "pending" ? <Clock size={11} className="animate-pulse" /> :
+                  msg.status === "sent" ? <Check size={12} /> :
+                  msg.status === "delivered" ? <CheckCheck size={12} /> :
                   <CheckCheck size={12} className="text-blue-400" />
                 )}
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         )})}
+        </AnimatePresence>
         <div ref={bottomRef} />
       </div>
 
@@ -508,6 +524,12 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         onToggleEmoji={() => { setShowEmoji(!showEmoji); setShowAttach(false); }}
         onToggleAttach={() => { setShowAttach(!showAttach); setShowEmoji(false); }}
         placeholder={t("typeMessage")}
+      />
+
+      <AttachmentMenu
+        open={showAttach}
+        onClose={() => setShowAttach(false)}
+        onSelect={handleFileSelect}
       />
 
       <AnimatePresence>
