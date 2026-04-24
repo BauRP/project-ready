@@ -240,10 +240,66 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const filteredMessages = useMemo(() => messages.filter((message) => !isExpired(message.deleteAt)), [messages]);
+  // Apply lifecycle: hide deleted-for-me, mark deleted-for-everyone as tombstones, override text on edit.
+  const visibleMessages = useMemo(() => {
+    return messages
+      .filter((message) => !isExpired(message.deleteAt))
+      .filter((message) => {
+        const lc = lifecycle[message.id];
+        if (!lc) return true;
+        if (userId && lc.deletedFor?.includes(userId)) return false;
+        return true;
+      });
+  }, [messages, lifecycle, userId]);
+
+  const getEffectiveText = useCallback(
+    (msg: Message): { text: string; isEdited: boolean; isTombstone: boolean } => {
+      const lc = lifecycle[msg.id];
+      if (lc?.deletedForEveryone) {
+        return { text: t("messageDeleted"), isEdited: false, isTombstone: true };
+      }
+      if (lc?.isEdited && typeof lc.editedText === "string") {
+        return { text: lc.editedText, isEdited: true, isTombstone: false };
+      }
+      return { text: msg.text, isEdited: false, isTombstone: false };
+    },
+    [lifecycle, t],
+  );
+
+  const pinnedMessageId = useMemo(() => {
+    let bestId: string | null = null;
+    let bestAt = 0;
+    for (const [id, lc] of Object.entries(lifecycle)) {
+      if (lc.pinnedAt && lc.pinnedAt > bestAt && !lc.deletedForEveryone) {
+        // Only show pin if message is still visible to this user
+        const exists = messages.some((m) => m.id === id);
+        const hiddenForMe = userId ? lc.deletedFor?.includes(userId) : false;
+        if (exists && !hiddenForMe) {
+          bestId = id;
+          bestAt = lc.pinnedAt;
+        }
+      }
+    }
+    return bestId;
+  }, [lifecycle, messages, userId]);
+
+  const pinnedMessage = pinnedMessageId ? messages.find((m) => m.id === pinnedMessageId) : null;
+  const pinnedPreview = pinnedMessage
+    ? (() => {
+        const eff = getEffectiveText(pinnedMessage);
+        if (eff.text) return eff.text;
+        if (pinnedMessage.media) return pinnedMessage.media.name || "Media";
+        return "Message";
+      })()
+    : "";
+
+  const filteredMessages = visibleMessages;
   const searchMatches = useMemo(
-    () => filteredMessages.filter((message) => searchQuery.trim() && message.text.toLowerCase().includes(searchQuery.trim().toLowerCase())),
-    [filteredMessages, searchQuery],
+    () =>
+      filteredMessages.filter(
+        (message) => searchQuery.trim() && getEffectiveText(message).text.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+      ),
+    [filteredMessages, searchQuery, getEffectiveText],
   );
 
   useEffect(() => {
