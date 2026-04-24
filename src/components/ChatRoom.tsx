@@ -24,6 +24,15 @@ import {
   type P2PMessage,
 } from "@/lib/p2p";
 import { bufferMessageInCloud, updateMessageStatus, listenForStatusUpdates } from "@/lib/firebase-sync";
+import {
+  subscribeLifecycle,
+  editMessage as fsEditMessage,
+  deleteMessageForMe as fsDeleteForMe,
+  deleteMessageForEveryone as fsDeleteForEveryone,
+  pinMessage as fsPinMessage,
+  unpinMessage as fsUnpinMessage,
+  type MessageLifecycle,
+} from "@/lib/firestore-messages";
 import AudioWaveformPlayer from "./AudioWaveformPlayer";
 import SecurityScanOverlay from "./SecurityScanOverlay";
 import MessageInput from "./MessageInput";
@@ -32,6 +41,7 @@ import ChatSearchBar from "./ChatSearchBar";
 import ForwardMediaSheet from "./ForwardMediaSheet";
 import TranslationPlate from "./TranslationPlate";
 import AttachmentMenu from "./AttachmentMenu";
+import PinnedHeader from "./PinnedHeader";
 import { getChatPreferences, getDeleteAt, isExpired } from "@/lib/chat-preferences";
 import { notifyIncomingMessage, translateIncomingMessage } from "@/lib/notifications";
 
