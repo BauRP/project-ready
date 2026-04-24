@@ -120,7 +120,19 @@ export type TranslationKey =
   | "mediaUploadFailed"
   | "uploading"
   | "disappearingMessages"
-  | "translationSettings";
+  | "translationSettings"
+  | "edit"
+  | "edited"
+  | "editMessage"
+  | "saveEdit"
+  | "cancelEdit"
+  | "deleteForMe"
+  | "deleteForEveryone"
+  | "messageDeleted"
+  | "pin"
+  | "unpin"
+  | "pinned"
+  | "pinnedMessage";
 
 type TranslationMap = Partial<Record<TranslationKey, string>>;
 
