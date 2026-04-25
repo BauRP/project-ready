@@ -69,6 +69,11 @@ const Index = () => {
     }
   }, [biometricLocked, handleUnlock]);
 
+  // Invisible Mode → presence ONLY. Never touches ad rendering.
+  useEffect(() => {
+    setInvisibleMode(stealthMode, userId || undefined);
+  }, [stealthMode, userId]);
+
   useEffect(() => {
     if (!userId) return;
     initPeer(userId).catch(() => {});
