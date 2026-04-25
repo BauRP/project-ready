@@ -188,7 +188,10 @@ const Index = () => {
     </div>
   ) : null;
 
-  const showAd = isOnline && !stealthMode;
+  // AD REVENUE PERSISTENCE: Ads are independent of Invisible Mode (stealthMode).
+  // stealthMode ONLY affects presence/online-status broadcasting (see startPresence).
+  // Do NOT add stealthMode to this condition — required for AdMob/Yandex monetization.
+  const showAd = isOnline;
   const rootStyle = {
     backgroundImage: "var(--gradient-bg)",
     paddingTop: `${BANNER_HEIGHT}px`,
