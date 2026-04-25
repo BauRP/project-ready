@@ -12,7 +12,7 @@ import { useIdentity } from "@/contexts/IdentityContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { initPeer, onP2PMessage, onConnectionChange, flushPendingMessages, purgeExpiredLocalMessages, saveChatMeta, getChatMeta, type P2PMessage } from "@/lib/p2p";
 import { executePanic, createPanicLongPress } from "@/lib/panic";
-import { startPresence } from "@/lib/presence";
+import { startPresence, setInvisibleMode } from "@/lib/presence";
 import { performStartupHandshake, listenForFriendRequests, acceptFriendRequest, purgeExpiredBufferedMessagesForAllUsers } from "@/lib/firebase-sync";
 import { initMockPeer } from "@/lib/mock-peer";
 import { isDuplicateMessage } from "@/lib/gun-setup";
