@@ -42,6 +42,7 @@ import ForwardMediaSheet from "./ForwardMediaSheet";
 import TranslationPlate from "./TranslationPlate";
 import AttachmentMenu from "./AttachmentMenu";
 import PinnedHeader from "./PinnedHeader";
+import DeleteMessageSheet from "./DeleteMessageSheet";
 import { getChatPreferences, getDeleteAt, isExpired } from "@/lib/chat-preferences";
 import { notifyIncomingMessage, translateIncomingMessage } from "@/lib/notifications";
 
@@ -84,6 +85,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const [forwardingMedia, setForwardingMedia] = useState<MediaAttachment | null>(null);
   const [forwardSheetOpen, setForwardSheetOpen] = useState(false);
+  const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
   const [disappearingDuration, setDisappearingDuration] = useState<"1h" | "6h" | "12h" | "24h" | "off">("off");
   const [lifecycle, setLifecycle] = useState<Record<string, MessageLifecycle>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -240,30 +242,30 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Apply lifecycle: hide deleted-for-me, mark deleted-for-everyone as tombstones, override text on edit.
+  // Apply lifecycle:
+  //  - Keep deleted-for-me messages visible (rendered as a "You deleted this
+  //    message" placeholder, WhatsApp-style — only the deleter sees it).
+  //  - "Deleted for everyone" rendered as the public tombstone for both sides.
+  //  - Edits override displayed text.
   const visibleMessages = useMemo(() => {
-    return messages
-      .filter((message) => !isExpired(message.deleteAt))
-      .filter((message) => {
-        const lc = lifecycle[message.id];
-        if (!lc) return true;
-        if (userId && lc.deletedFor?.includes(userId)) return false;
-        return true;
-      });
-  }, [messages, lifecycle, userId]);
+    return messages.filter((message) => !isExpired(message.deleteAt));
+  }, [messages]);
 
   const getEffectiveText = useCallback(
     (msg: Message): { text: string; isEdited: boolean; isTombstone: boolean } => {
       const lc = lifecycle[msg.id];
       if (lc?.deletedForEveryone) {
-        return { text: t("messageDeleted"), isEdited: false, isTombstone: true };
+        return { text: t("messageDeletedForAll"), isEdited: false, isTombstone: true };
+      }
+      if (userId && lc?.deletedFor?.includes(userId)) {
+        return { text: t("messageDeletedByMe"), isEdited: false, isTombstone: true };
       }
       if (lc?.isEdited && typeof lc.editedText === "string") {
         return { text: lc.editedText, isEdited: true, isTombstone: false };
       }
       return { text: msg.text, isEdited: false, isTombstone: false };
     },
-    [lifecycle, t],
+    [lifecycle, t, userId],
   );
 
   const pinnedMessageId = useMemo(() => {
@@ -449,16 +451,30 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const statusLabel = peerStatus === "online" ? t("online") : peerStatus === "away" ? t("away") : t("offline");
   const statusColor = peerStatus === "online" ? "text-primary" : peerStatus === "away" ? "text-yellow-500" : "text-muted-foreground";
   const selectedMessages = filteredMessages.filter((message) => selectedIds.includes(message.id));
-  const allowCopy = selectedMessages.length > 0 && selectedMessages.every((message) => !!getEffectiveText(message).text && !message.media);
+  const allowCopy =
+    selectedMessages.length > 0 &&
+    selectedMessages.every((message) => {
+      const eff = getEffectiveText(message);
+      return !!eff.text && !eff.isTombstone && !message.media;
+    });
   const allowMediaActions = selectedMessages.length === 1 && !!selectedMessages[0]?.media;
   const singleSel = selectedMessages.length === 1 ? selectedMessages[0] : null;
   const singleSelLifecycle = singleSel ? lifecycle[singleSel.id] : undefined;
+  const singleSelIsTombstone = singleSel ? getEffectiveText(singleSel).isTombstone : false;
   // Edit only own, text-only, non-tombstone messages.
-  const allowEdit = !!singleSel && singleSel.sent && !singleSel.media && !singleSelLifecycle?.deletedForEveryone && !!getEffectiveText(singleSel).text;
-  const allowPin = !!singleSel && !singleSelLifecycle?.deletedForEveryone;
+  const allowEdit =
+    !!singleSel && singleSel.sent && !singleSel.media && !singleSelIsTombstone && !!getEffectiveText(singleSel).text;
+  const allowPin = !!singleSel && !singleSelIsTombstone;
   const isPinnedSel = !!singleSel && !!singleSelLifecycle?.pinnedAt;
-  // Delete-for-everyone only for messages I sent.
-  const allowDeleteForEveryone = selectedMessages.length > 0 && selectedMessages.every((m) => m.sent);
+  // Ownership gate: trash icon visible ONLY when every selected message
+  // belongs to the current user (and isn't already a tombstone). This
+  // prevents users from attempting to delete the other party's content.
+  const allowDelete =
+    selectedMessages.length > 0 &&
+    selectedMessages.every((m) => m.sent && !getEffectiveText(m).isTombstone);
+  // Inside the bottom sheet, "Delete for everyone" is offered whenever the
+  // user owns the selection — i.e. always when allowDelete is true.
+  const canDeleteForEveryone = allowDelete;
 
   const handleEditStart = () => {
     if (!singleSel) return;
@@ -483,29 +499,49 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     setSelectedIds([]);
   };
 
+  // Optimistic UI: tombstone appears instantly via local lifecycle state,
+  // then the Firestore write reconciles. Real text is never re-rendered.
   const handleDeleteForMe = async () => {
     if (!userId || selectedMessages.length === 0) return;
+    const ids = selectedMessages.map((m) => m.id);
+    setLifecycle((prev) => {
+      const next = { ...prev };
+      for (const id of ids) {
+        const cur = next[id] || { messageId: id };
+        const deletedFor = Array.from(new Set([...(cur.deletedFor || []), userId]));
+        next[id] = { ...cur, deletedFor };
+      }
+      return next;
+    });
+    setDeleteSheetOpen(false);
+    setSelectedIds([]);
     try {
-      await Promise.all(
-        selectedMessages.map((m) => fsDeleteForMe(userId, chatId, m.id)),
-      );
+      await Promise.all(selectedMessages.map((m) => fsDeleteForMe(userId, chatId, m.id)));
     } catch (e) {
       console.error("[ChatRoom] delete for me failed", e);
     }
-    setSelectedIds([]);
   };
 
   const handleDeleteForEveryone = async () => {
     if (!userId || selectedMessages.length === 0) return;
+    const ids = selectedMessages.map((m) => m.id);
+    setLifecycle((prev) => {
+      const next = { ...prev };
+      for (const id of ids) {
+        const cur = next[id] || { messageId: id };
+        next[id] = { ...cur, deletedForEveryone: true };
+      }
+      return next;
+    });
+    setDeleteSheetOpen(false);
+    setSelectedIds([]);
     try {
-      await Promise.all(
-        selectedMessages.map((m) => fsDeleteForEveryone(userId, chatId, m.id)),
-      );
+      await Promise.all(selectedMessages.map((m) => fsDeleteForEveryone(userId, chatId, m.id)));
     } catch (e) {
       console.error("[ChatRoom] delete for everyone failed", e);
     }
-    setSelectedIds([]);
   };
+
 
   const jumpToMessage = (id: string) => {
     const node = messageRefs.current[id];
@@ -565,8 +601,8 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           allowEdit={allowEdit}
           allowPin={allowPin}
           isPinned={isPinnedSel}
-          allowDeleteForEveryone={allowDeleteForEveryone}
-          onClose={() => setSelectedIds([])}
+          allowDelete={allowDelete}
+          onClose={() => { setSelectedIds([]); setDeleteSheetOpen(false); }}
           onCopy={async () => {
             await navigator.clipboard.writeText(selectedMessages.map((message) => getEffectiveText(message).text).join("\n"));
             toast({ title: "Copied" });
@@ -584,8 +620,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           }}
           onEdit={handleEditStart}
           onPinToggle={handlePinToggle}
-          onDeleteForMe={handleDeleteForMe}
-          onDeleteForEveryone={handleDeleteForEveryone}
+          onDelete={() => setDeleteSheetOpen(true)}
         />
       ) : (
       <div className="header-safe-zone glass-panel rounded-none border-x-0 border-t-0 px-3 pb-2 header-bar-56 gap-3 z-10 shrink-0 flex items-center">
@@ -773,6 +808,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           setForwardingMedia(null);
           setSelectedIds([]);
         }}
+      />
+      <DeleteMessageSheet
+        open={deleteSheetOpen}
+        canDeleteForEveryone={canDeleteForEveryone}
+        onClose={() => setDeleteSheetOpen(false)}
+        onDeleteForMe={handleDeleteForMe}
+        onDeleteForEveryone={handleDeleteForEveryone}
       />
     </div>
   );

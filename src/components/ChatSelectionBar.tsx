@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, Forward, Share2, Pencil, Pin, PinOff, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Copy, Forward, Share2, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 
 interface ChatSelectionBarProps {
   count: number;
@@ -7,15 +7,16 @@ interface ChatSelectionBarProps {
   allowEdit?: boolean;
   allowPin?: boolean;
   isPinned?: boolean;
-  allowDeleteForEveryone?: boolean;
+  /** Show the trash icon. False when no selected message can be deleted (e.g. only foreign tombstones). */
+  allowDelete?: boolean;
   onClose: () => void;
   onCopy: () => void;
   onForward: () => void;
   onShare: () => void;
   onEdit?: () => void;
   onPinToggle?: () => void;
-  onDeleteForMe?: () => void;
-  onDeleteForEveryone?: () => void;
+  /** Opens the delete confirmation bottom sheet. */
+  onDelete?: () => void;
 }
 
 const iconButton = "p-2 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground";
@@ -27,15 +28,14 @@ const ChatSelectionBar = ({
   allowEdit,
   allowPin,
   isPinned,
-  allowDeleteForEveryone,
+  allowDelete,
   onClose,
   onCopy,
   onForward,
   onShare,
   onEdit,
   onPinToggle,
-  onDeleteForMe,
-  onDeleteForEveryone,
+  onDelete,
 }: ChatSelectionBarProps) => {
   return (
     <div className="header-safe-zone glass-panel rounded-none border-x-0 border-t-0 px-3 pb-2 header-bar-56 gap-2 z-10 shrink-0 flex items-center">
@@ -45,6 +45,14 @@ const ChatSelectionBar = ({
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm text-foreground truncate">{count}</p>
       </div>
+
+      {/*
+        Action cluster: right-aligned, evenly spaced. The "two red people"
+        (Users) icon was permanently removed — destructive deletion is now a
+        single Trash button that opens a bottom-sheet confirmation. The
+        remaining icons (Edit · Copy · Pin · Forward/Share · Trash) flow
+        naturally to the right thanks to the flex-1 spacer above.
+      */}
 
       {allowEdit && onEdit && (
         <button onClick={onEdit} className={iconButton} aria-label="Edit message">
@@ -75,19 +83,9 @@ const ChatSelectionBar = ({
         </>
       )}
 
-      {onDeleteForMe && (
-        <button onClick={onDeleteForMe} className={iconButton} aria-label="Delete for me">
+      {allowDelete && onDelete && (
+        <button onClick={onDelete} className={iconButton} aria-label="Delete message">
           <Trash2 size={18} />
-        </button>
-      )}
-
-      {allowDeleteForEveryone && onDeleteForEveryone && (
-        <button
-          onClick={onDeleteForEveryone}
-          className="p-2 rounded-lg hover:bg-destructive/15 transition-colors text-destructive"
-          aria-label="Delete for everyone"
-        >
-          <Users size={18} />
         </button>
       )}
     </div>
