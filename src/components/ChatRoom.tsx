@@ -451,16 +451,30 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const statusLabel = peerStatus === "online" ? t("online") : peerStatus === "away" ? t("away") : t("offline");
   const statusColor = peerStatus === "online" ? "text-primary" : peerStatus === "away" ? "text-yellow-500" : "text-muted-foreground";
   const selectedMessages = filteredMessages.filter((message) => selectedIds.includes(message.id));
-  const allowCopy = selectedMessages.length > 0 && selectedMessages.every((message) => !!getEffectiveText(message).text && !message.media);
+  const allowCopy =
+    selectedMessages.length > 0 &&
+    selectedMessages.every((message) => {
+      const eff = getEffectiveText(message);
+      return !!eff.text && !eff.isTombstone && !message.media;
+    });
   const allowMediaActions = selectedMessages.length === 1 && !!selectedMessages[0]?.media;
   const singleSel = selectedMessages.length === 1 ? selectedMessages[0] : null;
   const singleSelLifecycle = singleSel ? lifecycle[singleSel.id] : undefined;
+  const singleSelIsTombstone = singleSel ? getEffectiveText(singleSel).isTombstone : false;
   // Edit only own, text-only, non-tombstone messages.
-  const allowEdit = !!singleSel && singleSel.sent && !singleSel.media && !singleSelLifecycle?.deletedForEveryone && !!getEffectiveText(singleSel).text;
-  const allowPin = !!singleSel && !singleSelLifecycle?.deletedForEveryone;
+  const allowEdit =
+    !!singleSel && singleSel.sent && !singleSel.media && !singleSelIsTombstone && !!getEffectiveText(singleSel).text;
+  const allowPin = !!singleSel && !singleSelIsTombstone;
   const isPinnedSel = !!singleSel && !!singleSelLifecycle?.pinnedAt;
-  // Delete-for-everyone only for messages I sent.
-  const allowDeleteForEveryone = selectedMessages.length > 0 && selectedMessages.every((m) => m.sent);
+  // Ownership gate: trash icon visible ONLY when every selected message
+  // belongs to the current user (and isn't already a tombstone). This
+  // prevents users from attempting to delete the other party's content.
+  const allowDelete =
+    selectedMessages.length > 0 &&
+    selectedMessages.every((m) => m.sent && !getEffectiveText(m).isTombstone);
+  // Inside the bottom sheet, "Delete for everyone" is offered whenever the
+  // user owns the selection — i.e. always when allowDelete is true.
+  const canDeleteForEveryone = allowDelete;
 
   const handleEditStart = () => {
     if (!singleSel) return;
