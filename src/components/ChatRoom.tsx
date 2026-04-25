@@ -809,6 +809,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           setSelectedIds([]);
         }}
       />
+      <DeleteMessageSheet
+        open={deleteSheetOpen}
+        canDeleteForEveryone={canDeleteForEveryone}
+        onClose={() => setDeleteSheetOpen(false)}
+        onDeleteForMe={handleDeleteForMe}
+        onDeleteForEveryone={handleDeleteForEveryone}
+      />
     </div>
   );
 };
