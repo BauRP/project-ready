@@ -221,7 +221,7 @@ const Index = () => {
   return (
     <div className="max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
       {biometricOverlay}
-      {showAd && <AdMobBanner stealthMode={stealthMode} />}
+      {showAd && <AdMobBanner />}
       <div
         {...panicHandlers}
         className="absolute left-0 w-12 h-12 z-50 safe-top-offset"
