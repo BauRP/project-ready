@@ -42,8 +42,7 @@ export function startPresence(userId: string) {
   heartbeatTimer = setInterval(() => publishHeartbeat(userId), HEARTBEAT_INTERVAL);
 
   const handleVisibility = () => {
-    // Босс: теперь при сворачивании ставим 'away', а не полный 'offline'
-    // Это критично для Android 16, чтобы P2P канал не закрывался мгновенно
+    if (invisibleMode) return;
     if (document.hidden) {
       publishStatus(userId, "away");
     } else {
