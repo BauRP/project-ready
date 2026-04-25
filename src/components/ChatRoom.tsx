@@ -242,30 +242,30 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Apply lifecycle: hide deleted-for-me, mark deleted-for-everyone as tombstones, override text on edit.
+  // Apply lifecycle:
+  //  - Keep deleted-for-me messages visible (rendered as a "You deleted this
+  //    message" placeholder, WhatsApp-style — only the deleter sees it).
+  //  - "Deleted for everyone" rendered as the public tombstone for both sides.
+  //  - Edits override displayed text.
   const visibleMessages = useMemo(() => {
-    return messages
-      .filter((message) => !isExpired(message.deleteAt))
-      .filter((message) => {
-        const lc = lifecycle[message.id];
-        if (!lc) return true;
-        if (userId && lc.deletedFor?.includes(userId)) return false;
-        return true;
-      });
-  }, [messages, lifecycle, userId]);
+    return messages.filter((message) => !isExpired(message.deleteAt));
+  }, [messages]);
 
   const getEffectiveText = useCallback(
     (msg: Message): { text: string; isEdited: boolean; isTombstone: boolean } => {
       const lc = lifecycle[msg.id];
       if (lc?.deletedForEveryone) {
-        return { text: t("messageDeleted"), isEdited: false, isTombstone: true };
+        return { text: t("messageDeletedForAll"), isEdited: false, isTombstone: true };
+      }
+      if (userId && lc?.deletedFor?.includes(userId)) {
+        return { text: t("messageDeletedByMe"), isEdited: false, isTombstone: true };
       }
       if (lc?.isEdited && typeof lc.editedText === "string") {
         return { text: lc.editedText, isEdited: true, isTombstone: false };
       }
       return { text: msg.text, isEdited: false, isTombstone: false };
     },
-    [lifecycle, t],
+    [lifecycle, t, userId],
   );
 
   const pinnedMessageId = useMemo(() => {
