@@ -499,29 +499,49 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     setSelectedIds([]);
   };
 
+  // Optimistic UI: tombstone appears instantly via local lifecycle state,
+  // then the Firestore write reconciles. Real text is never re-rendered.
   const handleDeleteForMe = async () => {
     if (!userId || selectedMessages.length === 0) return;
+    const ids = selectedMessages.map((m) => m.id);
+    setLifecycle((prev) => {
+      const next = { ...prev };
+      for (const id of ids) {
+        const cur = next[id] || { messageId: id };
+        const deletedFor = Array.from(new Set([...(cur.deletedFor || []), userId]));
+        next[id] = { ...cur, deletedFor };
+      }
+      return next;
+    });
+    setDeleteSheetOpen(false);
+    setSelectedIds([]);
     try {
-      await Promise.all(
-        selectedMessages.map((m) => fsDeleteForMe(userId, chatId, m.id)),
-      );
+      await Promise.all(selectedMessages.map((m) => fsDeleteForMe(userId, chatId, m.id)));
     } catch (e) {
       console.error("[ChatRoom] delete for me failed", e);
     }
-    setSelectedIds([]);
   };
 
   const handleDeleteForEveryone = async () => {
     if (!userId || selectedMessages.length === 0) return;
+    const ids = selectedMessages.map((m) => m.id);
+    setLifecycle((prev) => {
+      const next = { ...prev };
+      for (const id of ids) {
+        const cur = next[id] || { messageId: id };
+        next[id] = { ...cur, deletedForEveryone: true };
+      }
+      return next;
+    });
+    setDeleteSheetOpen(false);
+    setSelectedIds([]);
     try {
-      await Promise.all(
-        selectedMessages.map((m) => fsDeleteForEveryone(userId, chatId, m.id)),
-      );
+      await Promise.all(selectedMessages.map((m) => fsDeleteForEveryone(userId, chatId, m.id)));
     } catch (e) {
       console.error("[ChatRoom] delete for everyone failed", e);
     }
-    setSelectedIds([]);
   };
+
 
   const jumpToMessage = (id: string) => {
     const node = messageRefs.current[id];
