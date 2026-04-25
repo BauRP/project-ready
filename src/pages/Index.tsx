@@ -12,7 +12,7 @@ import { useIdentity } from "@/contexts/IdentityContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { initPeer, onP2PMessage, onConnectionChange, flushPendingMessages, purgeExpiredLocalMessages, saveChatMeta, getChatMeta, type P2PMessage } from "@/lib/p2p";
 import { executePanic, createPanicLongPress } from "@/lib/panic";
-import { startPresence } from "@/lib/presence";
+import { startPresence, setInvisibleMode } from "@/lib/presence";
 import { performStartupHandshake, listenForFriendRequests, acceptFriendRequest, purgeExpiredBufferedMessagesForAllUsers } from "@/lib/firebase-sync";
 import { initMockPeer } from "@/lib/mock-peer";
 import { isDuplicateMessage } from "@/lib/gun-setup";
@@ -68,6 +68,11 @@ const Index = () => {
       handleUnlock();
     }
   }, [biometricLocked, handleUnlock]);
+
+  // Invisible Mode → presence ONLY. Never touches ad rendering.
+  useEffect(() => {
+    setInvisibleMode(stealthMode, userId || undefined);
+  }, [stealthMode, userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -188,7 +193,10 @@ const Index = () => {
     </div>
   ) : null;
 
-  const showAd = isOnline && !stealthMode;
+  // AD REVENUE PERSISTENCE: Ads are independent of Invisible Mode (stealthMode).
+  // stealthMode ONLY affects presence/online-status broadcasting (see startPresence).
+  // Do NOT add stealthMode to this condition — required for AdMob/Yandex monetization.
+  const showAd = isOnline;
   const rootStyle = {
     backgroundImage: "var(--gradient-bg)",
     paddingTop: `${BANNER_HEIGHT}px`,
@@ -202,7 +210,7 @@ const Index = () => {
     return (
       <div className="max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
         {biometricOverlay}
-        {showAd && <AdMobBanner stealthMode={stealthMode} />}
+        {showAd && <AdMobBanner />}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <ChatRoom
             chatId={openChat.id}
@@ -218,7 +226,7 @@ const Index = () => {
   return (
     <div className="max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
       {biometricOverlay}
-      {showAd && <AdMobBanner stealthMode={stealthMode} />}
+      {showAd && <AdMobBanner />}
       <div
         {...panicHandlers}
         className="absolute left-0 w-12 h-12 z-50 safe-top-offset"

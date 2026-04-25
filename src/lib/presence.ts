@@ -1,4 +1,10 @@
 // Real-time presence system via GunDB
+//
+// State Isolation Policy:
+//  - "Invisible Mode" (stealthMode) is enforced HERE on presence broadcasting.
+//  - When invisible, the user's heartbeat / online status is NOT published —
+//    peers will see them as "offline".
+//  - This MUST NOT be coupled to ad rendering. Ads remain visible regardless.
 import gun from "./gun-setup";
 
 type PresenceStatus = "online" | "away" | "offline";
@@ -7,10 +13,28 @@ type PresenceCallback = (userId: string, status: PresenceStatus) => void;
 const listeners = new Set<PresenceCallback>();
 const presenceCache = new Map<string, PresenceStatus>();
 
-const HEARTBEAT_INTERVAL = 15000; // 15s - Босс: чуть реже, чтобы не нагружать сеть
-const OFFLINE_THRESHOLD = 60000; // 60s - Босс: даем больше времени, чтобы статус не прыгал
+const HEARTBEAT_INTERVAL = 15000; // 15s
+const OFFLINE_THRESHOLD = 60000; // 60s
 
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let invisibleMode = false;
+
+export function setInvisibleMode(enabled: boolean, userId?: string) {
+  const wasInvisible = invisibleMode;
+  invisibleMode = enabled;
+  if (!userId) return;
+  if (enabled && !wasInvisible) {
+    // Going invisible: tell peers we're offline immediately.
+    try {
+      gun.get("trivo-presence").get(userId).put({
+        status: "offline",
+        lastSeen: Date.now(),
+      });
+    } catch {}
+  } else if (!enabled && wasInvisible) {
+    publishHeartbeat(userId);
+  }
+}
 
 export function startPresence(userId: string) {
   publishHeartbeat(userId);
@@ -18,8 +42,7 @@ export function startPresence(userId: string) {
   heartbeatTimer = setInterval(() => publishHeartbeat(userId), HEARTBEAT_INTERVAL);
 
   const handleVisibility = () => {
-    // Босс: теперь при сворачивании ставим 'away', а не полный 'offline'
-    // Это критично для Android 16, чтобы P2P канал не закрывался мгновенно
+    if (invisibleMode) return;
     if (document.hidden) {
       publishStatus(userId, "away");
     } else {
@@ -40,6 +63,9 @@ export function startPresence(userId: string) {
 }
 
 function publishHeartbeat(userId: string) {
+  // Invisible Mode: skip presence broadcast so other users see us offline.
+  // Does NOT affect ads, P2P messaging, or any other subsystem.
+  if (invisibleMode) return;
   try {
     gun.get("trivo-presence").get(userId).put({
       status: document.hidden ? "away" : "online",
@@ -49,6 +75,8 @@ function publishHeartbeat(userId: string) {
 }
 
 function publishStatus(userId: string, status: PresenceStatus) {
+  // Respect Invisible Mode: never advertise online/away while invisible.
+  if (invisibleMode && status !== "offline") return;
   try {
     gun.get("trivo-presence").get(userId).put({
       status,
