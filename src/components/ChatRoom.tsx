@@ -42,6 +42,7 @@ import ForwardMediaSheet from "./ForwardMediaSheet";
 import TranslationPlate from "./TranslationPlate";
 import AttachmentMenu from "./AttachmentMenu";
 import PinnedHeader from "./PinnedHeader";
+import DeleteMessageSheet from "./DeleteMessageSheet";
 import { getChatPreferences, getDeleteAt, isExpired } from "@/lib/chat-preferences";
 import { notifyIncomingMessage, translateIncomingMessage } from "@/lib/notifications";
 
