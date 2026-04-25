@@ -602,7 +602,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           allowPin={allowPin}
           isPinned={isPinnedSel}
           allowDelete={allowDelete}
-          onClose={() => setSelectedIds([])}
+          onClose={() => { setSelectedIds([]); setDeleteSheetOpen(false); }}
           onCopy={async () => {
             await navigator.clipboard.writeText(selectedMessages.map((message) => getEffectiveText(message).text).join("\n"));
             toast({ title: "Copied" });
