@@ -601,7 +601,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           allowEdit={allowEdit}
           allowPin={allowPin}
           isPinned={isPinnedSel}
-          allowDeleteForEveryone={allowDeleteForEveryone}
+          allowDelete={allowDelete}
           onClose={() => setSelectedIds([])}
           onCopy={async () => {
             await navigator.clipboard.writeText(selectedMessages.map((message) => getEffectiveText(message).text).join("\n"));
@@ -620,8 +620,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           }}
           onEdit={handleEditStart}
           onPinToggle={handlePinToggle}
-          onDeleteForMe={handleDeleteForMe}
-          onDeleteForEveryone={handleDeleteForEveryone}
+          onDelete={() => setDeleteSheetOpen(true)}
         />
       ) : (
       <div className="header-safe-zone glass-panel rounded-none border-x-0 border-t-0 px-3 pb-2 header-bar-56 gap-3 z-10 shrink-0 flex items-center">
