@@ -75,6 +75,8 @@ function publishHeartbeat(userId: string) {
 }
 
 function publishStatus(userId: string, status: PresenceStatus) {
+  // Respect Invisible Mode: never advertise online/away while invisible.
+  if (invisibleMode && status !== "offline") return;
   try {
     gun.get("trivo-presence").get(userId).put({
       status,
