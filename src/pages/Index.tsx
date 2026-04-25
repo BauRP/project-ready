@@ -205,7 +205,7 @@ const Index = () => {
     return (
       <div className="max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
         {biometricOverlay}
-        {showAd && <AdMobBanner stealthMode={stealthMode} />}
+        {showAd && <AdMobBanner />}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <ChatRoom
             chatId={openChat.id}
