@@ -85,6 +85,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const [forwardingMedia, setForwardingMedia] = useState<MediaAttachment | null>(null);
   const [forwardSheetOpen, setForwardSheetOpen] = useState(false);
+  const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
   const [disappearingDuration, setDisappearingDuration] = useState<"1h" | "6h" | "12h" | "24h" | "off">("off");
   const [lifecycle, setLifecycle] = useState<Record<string, MessageLifecycle>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
