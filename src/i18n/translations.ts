@@ -133,7 +133,6 @@ export type TranslationKey =
   | "messageDeletedForAll"
   | "deleteMessageTitle"
   | "deleteMessageDescription"
-  | "cancel"
   | "pin"
   | "unpin"
   | "pinned"
