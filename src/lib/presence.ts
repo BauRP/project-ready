@@ -63,6 +63,9 @@ export function startPresence(userId: string) {
 }
 
 function publishHeartbeat(userId: string) {
+  // Invisible Mode: skip presence broadcast so other users see us offline.
+  // Does NOT affect ads, P2P messaging, or any other subsystem.
+  if (invisibleMode) return;
   try {
     gun.get("trivo-presence").get(userId).put({
       status: document.hidden ? "away" : "online",
