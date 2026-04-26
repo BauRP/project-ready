@@ -231,7 +231,7 @@ const Index = () => {
   }
 
   return (
-    <div className="max-w-md mx-auto flex flex-col overflow-hidden" style={rootStyle}>
+    <div className="w-full flex flex-col overflow-hidden" style={rootStyle}>
       {biometricOverlay}
       {showAd && <AdMobBanner />}
       <div
