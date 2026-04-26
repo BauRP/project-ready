@@ -37,7 +37,7 @@ const AttachmentMenu = ({ open, onClose, onSelect }: AttachmentMenuProps) => {
             role="dialog"
             aria-label="Attach media"
           >
-            <div className="mx-auto max-w-md glass-panel neon-border rounded-2xl p-3 space-y-1">
+            <div className="mx-auto w-full max-w-2xl glass-panel neon-border rounded-2xl p-3 space-y-1">
               {items.map(({ key, label, accept, icon: Icon, tone }) => (
                 <button
                   key={key}
