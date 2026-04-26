@@ -45,6 +45,7 @@ import PinnedHeader from "./PinnedHeader";
 import DeleteMessageSheet from "./DeleteMessageSheet";
 import { getChatPreferences, getDeleteAt, isExpired } from "@/lib/chat-preferences";
 import { notifyIncomingMessage, translateIncomingMessage } from "@/lib/notifications";
+import { useBackNavigation } from "@/hooks/useBackNavigation";
 
 interface Message {
   id: string;
@@ -96,6 +97,33 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const { theme } = useTheme();
   const { userId } = useIdentity();
 
+  // Back-navigation: pop overlays in priority order before exiting the chat.
+  // Most-specific / most-recent overlay first.
+  const anyOverlayOpen =
+    showEmoji ||
+    showAttach ||
+    showReport ||
+    forwardSheetOpen ||
+    deleteSheetOpen ||
+    searchOpen ||
+    callType !== null ||
+    selectedIds.length > 0 ||
+    editingId !== null;
+
+  const handleBack = useCallback(() => {
+    if (showEmoji) { setShowEmoji(false); return true; }
+    if (showAttach) { setShowAttach(false); return true; }
+    if (showReport) { setShowReport(false); return true; }
+    if (forwardSheetOpen) { setForwardSheetOpen(false); return true; }
+    if (deleteSheetOpen) { setDeleteSheetOpen(false); return true; }
+    if (callType !== null) { setCallType(null); return true; }
+    if (searchOpen) { setSearchOpen(false); setSearchQuery(""); return true; }
+    if (editingId) { setEditingId(null); return true; }
+    if (selectedIds.length > 0) { setSelectedIds([]); return true; }
+    return false;
+  }, [showEmoji, showAttach, showReport, forwardSheetOpen, deleteSheetOpen, callType, searchOpen, editingId, selectedIds.length]);
+
+  useBackNavigation(anyOverlayOpen, handleBack);
   const syncIncomingTranslations = async (items: Message[]) => {
     const translated = await Promise.all(
       items.map(async (message) => {

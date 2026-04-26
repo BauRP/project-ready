@@ -19,6 +19,7 @@ import { isDuplicateMessage } from "@/lib/gun-setup";
 import { AD_CONFIG, BANNER_HEIGHT, getAppTopOffset, getBottomNavOffset } from "@/lib/ad-config";
 import { toast } from "sonner";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
+import { useBackNavigation } from "@/hooks/useBackNavigation";
 
 type Tab = "chats" | "add-friend" | "friends" | "security" | "profile";
 
@@ -168,6 +169,12 @@ const Index = () => {
   const handleOpenChat = (id: string, name: string, emoji: string) => {
     setOpenChat({ id, name, emoji });
   };
+
+  // Hardware/web Back closes the open chat first.
+  const closeOpenChat = useCallback(() => {
+    setOpenChat(null);
+  }, []);
+  useBackNavigation(!!openChat, closeOpenChat);
 
   // Biometric lock screen — full blur overlay to prevent data peeking
   const biometricOverlay = biometricLocked ? (
