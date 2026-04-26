@@ -428,7 +428,15 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     if (!file || !userId) return;
     e.target.value = "";
 
+    // Hard cap to keep Firebase Storage bandwidth predictable.
+    const MAX_BYTES = 20 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      toast({ title: t("fileTooLarge") || "File too large (max 20 MB)", variant: "destructive" });
+      return;
+    }
+
     setUploading(true);
+    const uploadingToast = toast({ title: t("uploading") || "Uploading…" });
     try {
       file = await stripExifMetadata(file);
       const scanResult = simulateSecurityScan(file.name, false);
@@ -472,6 +480,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     } catch {
       toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
     } finally {
+      uploadingToast.dismiss?.();
       setUploading(false);
     }
   };
