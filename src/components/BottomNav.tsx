@@ -24,7 +24,7 @@ const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
 
   return (
     <nav 
-      className="!fixed !bottom-0 left-0 right-0 z-[100] max-w-md mx-auto"
+      className="!fixed !bottom-0 left-0 right-0 z-[100] w-full"
       style={{
         position: "fixed",
         bottom: 0,
