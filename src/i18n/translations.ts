@@ -136,7 +136,12 @@ export type TranslationKey =
   | "pin"
   | "unpin"
   | "pinned"
-  | "pinnedMessage";
+  | "pinnedMessage"
+  | "fileTooLarge"
+  | "recordingHold"
+  | "recordingRelease"
+  | "recordingCancel"
+  | "micPermissionDenied";
 
 type TranslationMap = Partial<Record<TranslationKey, string>>;
 
@@ -261,6 +266,11 @@ const en: TranslationMap = {
   mediaUploaded: "Media sent",
   mediaUploadFailed: "Upload failed",
   uploading: "Uploading...",
+  fileTooLarge: "File too large (max 20 MB)",
+  recordingHold: "Hold to record",
+  recordingRelease: "Release to send",
+  recordingCancel: "Slide up to cancel",
+  micPermissionDenied: "Microphone permission denied",
   disappearingMessages: "Disappearing Messages",
   translationSettings: "Translation Settings",
   edit: "Edit",
@@ -404,6 +414,11 @@ const ru: TranslationMap = {
   translationSettings: "Настройки перевода",
   mediaUploadFailed: "Ошибка загрузки",
   uploading: "Загрузка...",
+  fileTooLarge: "Файл слишком большой (макс. 20 МБ)",
+  recordingHold: "Удерживайте для записи",
+  recordingRelease: "Отпустите, чтобы отправить",
+  recordingCancel: "Сдвиньте вверх для отмены",
+  micPermissionDenied: "Доступ к микрофону запрещён",
   edit: "Изменить",
   edited: "изменено",
   editMessage: "Редактировать сообщение",

@@ -423,12 +423,63 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     }
   };
 
+  // Voice messages bypass EXIF scrub (audio has no EXIF) and the malware scan
+  // (internal recording, not user-supplied). They flow through uploadMedia →
+  // sendP2PMessage → bufferMessageInCloud just like any other audio attachment.
+  const handleVoiceRecorded = async (file: File) => {
+    if (!userId) return;
+    setUploading(true);
+    const uploadingToast = toast({ title: t("uploading") || "Uploading…" });
+    try {
+      const media = await uploadMedia(file);
+      const msgId = generateUUIDv4();
+      const msg: P2PMessage & { media: MediaAttachment } = {
+        id: msgId,
+        from: userId,
+        to: chatId,
+        text: "",
+        timestamp: Date.now(),
+        status: "sent",
+        media,
+        deleteAt: getDeleteAt(Date.now(), disappearingDuration),
+      };
+      const peerId = `trivo-${chatId.replace(/[^a-zA-Z0-9]/g, "").substring(0, 20)}`;
+      const sent = await sendP2PMessage(peerId, msg as any);
+      if (!sent) await bufferMessageInCloud(chatId, msg as any);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: msg.id,
+          text: "",
+          sent: true,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          status: "sent",
+          media,
+          deleteAt: msg.deleteAt,
+        },
+      ]);
+    } catch {
+      toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
+    } finally {
+      uploadingToast.dismiss?.();
+      setUploading(false);
+    }
+  };
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
     if (!file || !userId) return;
     e.target.value = "";
 
+    // Hard cap to keep Firebase Storage bandwidth predictable.
+    const MAX_BYTES = 20 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      toast({ title: t("fileTooLarge") || "File too large (max 20 MB)", variant: "destructive" });
+      return;
+    }
+
     setUploading(true);
+    const uploadingToast = toast({ title: t("uploading") || "Uploading…" });
     try {
       file = await stripExifMetadata(file);
       const scanResult = simulateSecurityScan(file.name, false);
@@ -472,6 +523,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     } catch {
       toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
     } finally {
+      uploadingToast.dismiss?.();
       setUploading(false);
     }
   };
@@ -794,6 +846,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         onSubmit={sendMessage}
         onToggleEmoji={() => { setShowEmoji(!showEmoji); setShowAttach(false); }}
         onToggleAttach={() => { setShowAttach(!showAttach); setShowEmoji(false); }}
+        onVoiceRecorded={handleVoiceRecorded}
         placeholder={t("typeMessage")}
       />
 
