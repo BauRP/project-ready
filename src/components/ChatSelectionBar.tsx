@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, Forward, Share2, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
+import { ArrowLeft, Copy, CornerUpLeft, Forward, Share2, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 
 interface ChatSelectionBarProps {
   count: number;
@@ -7,6 +7,8 @@ interface ChatSelectionBarProps {
   allowEdit?: boolean;
   allowPin?: boolean;
   isPinned?: boolean;
+  /** Reply is only available when exactly one message is selected. */
+  allowReply?: boolean;
   /** Show the trash icon. False when no selected message can be deleted (e.g. only foreign tombstones). */
   allowDelete?: boolean;
   onClose: () => void;
@@ -15,6 +17,7 @@ interface ChatSelectionBarProps {
   onShare: () => void;
   onEdit?: () => void;
   onPinToggle?: () => void;
+  onReply?: () => void;
   /** Opens the delete confirmation bottom sheet. */
   onDelete?: () => void;
 }
