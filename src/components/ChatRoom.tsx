@@ -43,6 +43,7 @@ import TranslationPlate from "./TranslationPlate";
 import AttachmentMenu from "./AttachmentMenu";
 import PinnedHeader from "./PinnedHeader";
 import DeleteMessageSheet from "./DeleteMessageSheet";
+import UploadOverlay from "./UploadOverlay";
 import { getChatPreferences, getDeleteAt, isExpired } from "@/lib/chat-preferences";
 import { notifyIncomingMessage, translateIncomingMessage } from "@/lib/notifications";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
