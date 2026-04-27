@@ -213,14 +213,13 @@
     top: var(--app-top-offset);
     transition: top 0.2s ease-in-out;
   }
-  /* Edge-to-edge ad container reset — kills any inherited max-width / padding.
-     Hard-clipped overflow + contain layout prevents the SDK from triggering reflows
-     in the parent app shell when the CAB header swaps in. */
+  /* Block 4: Strict 320x50 standard banner. The container width is set
+     inline (320px) — the !important reset is removed so the ad doesn't
+     stretch full-bleed and so it can't overlap or capture taps for the
+     header buttons positioned beside it. */
   .ad-banner-container {
-    max-width: none !important;
-    width: 100vw !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
     overflow: hidden !important;
@@ -236,3 +235,46 @@
     align-items: center;
   }
 }
+
+/* ===== Block 6: Emoji picker — MAX-GRID rebuild =====
+   - Category icons forced to the absolute TOP via flex order.
+   - Search bar, "What's Your Mood?" preview footer, and per-category
+     section labels are removed.
+   - Grid is densified so 5–6 rows of emojis are visible at once.
+   The selectors target emoji-picker-react v4 classnames (.epr-*). */
+.trivo-emoji-picker .EmojiPickerReact {
+  --epr-emoji-size: 26px;
+  --epr-emoji-padding: 4px;
+  --epr-category-label-height: 0px;
+  --epr-header-padding: 4px 8px;
+  background: hsl(var(--background));
+  border: none;
+  display: flex;
+  flex-direction: column;
+}
+/* Hide search input row & preview / "mood" footer entirely. */
+.trivo-emoji-picker .epr-header-overlay,
+.trivo-emoji-picker .epr-search-container,
+.trivo-emoji-picker .epr-preview,
+.trivo-emoji-picker .epr-skin-tones {
+  display: none !important;
+}
+/* Hide the per-category text labels ("Smileys & People", etc.). */
+.trivo-emoji-picker .epr-emoji-category-label {
+  display: none !important;
+  height: 0 !important;
+}
+/* Pull the category icon nav to the top of the picker. */
+.trivo-emoji-picker .epr-category-nav {
+  order: -1;
+  padding: 6px 8px !important;
+  border-bottom: 1px solid hsl(var(--border));
+}
+/* Densify the scroll body so more rows fit. */
+.trivo-emoji-picker .epr-body {
+  padding-top: 0 !important;
+}
+.trivo-emoji-picker .epr-emoji-list {
+  padding: 4px !important;
+}
+

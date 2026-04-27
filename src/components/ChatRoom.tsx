@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Check, CheckCheck, Phone, Video, Flag, Download, Clock, ShieldAlert, Search, Pin, X } from "lucide-react";
+import { ArrowLeft, FileText, Check, CheckCheck, Phone, Video, Flag, Download, Clock, ShieldAlert, Search, Pin, X, CornerUpLeft } from "lucide-react";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
@@ -90,6 +90,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const [disappearingDuration, setDisappearingDuration] = useState<"1h" | "6h" | "12h" | "24h" | "off">("off");
   const [lifecycle, setLifecycle] = useState<Record<string, MessageLifecycle>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; preview: string; sent: boolean } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -108,7 +109,8 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     searchOpen ||
     callType !== null ||
     selectedIds.length > 0 ||
-    editingId !== null;
+    editingId !== null ||
+    replyTo !== null;
 
   const handleBack = useCallback(() => {
     if (showEmoji) { setShowEmoji(false); return true; }
@@ -119,9 +121,12 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     if (callType !== null) { setCallType(null); return true; }
     if (searchOpen) { setSearchOpen(false); setSearchQuery(""); return true; }
     if (editingId) { setEditingId(null); return true; }
+    // CAB / selection has priority over reply-quote so the user can dismiss
+    // the contextual bar without losing their pending reply draft.
     if (selectedIds.length > 0) { setSelectedIds([]); return true; }
+    if (replyTo) { setReplyTo(null); return true; }
     return false;
-  }, [showEmoji, showAttach, showReport, forwardSheetOpen, deleteSheetOpen, callType, searchOpen, editingId, selectedIds.length]);
+  }, [showEmoji, showAttach, showReport, forwardSheetOpen, deleteSheetOpen, callType, searchOpen, editingId, selectedIds.length, replyTo]);
 
   useBackNavigation(anyOverlayOpen, handleBack);
   const syncIncomingTranslations = async (items: Message[]) => {
@@ -358,7 +363,16 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     }
 
     const msgId = generateUUIDv4();
-    const currentInput = input;
+    // Block 5: prepend the quoted reply preview to the outgoing text. Persists
+    // through P2P and Firebase as plain markdown-style quotation, so both ends
+    // see the threaded context without requiring a schema migration.
+    const quoted = replyTo
+      ? replyTo.preview
+          .split("\n")
+          .map((line) => `> ${line}`)
+          .join("\n") + "\n\n"
+      : "";
+    const currentInput = quoted + input;
     const msg: P2PMessage = {
       id: msgId,
       from: userId,
@@ -376,6 +390,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     ]);
     
     setInput("");
+    setReplyTo(null);
     setShowEmoji(false);
     setSessionStarted(false);
 
@@ -555,6 +570,18 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   // Inside the bottom sheet, "Delete for everyone" is offered whenever the
   // user owns the selection — i.e. always when allowDelete is true.
   const canDeleteForEveryone = allowDelete;
+  // Reply only when exactly one non-tombstone message is selected.
+  const allowReply = !!singleSel && !singleSelIsTombstone;
+
+  const handleReplyStart = () => {
+    if (!singleSel) return;
+    const eff = getEffectiveText(singleSel);
+    const preview = eff.text || singleSel.media?.name || (singleSel.media ? "Media" : "Message");
+    setReplyTo({ id: singleSel.id, preview: preview.slice(0, 140), sent: singleSel.sent });
+    setSelectedIds([]);
+    setShowEmoji(false);
+    setShowAttach(false);
+  };
 
   const handleEditStart = () => {
     if (!singleSel) return;
@@ -681,6 +708,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           allowEdit={allowEdit}
           allowPin={allowPin}
           isPinned={isPinnedSel}
+          allowReply={allowReply}
           allowDelete={allowDelete}
           onClose={() => { setSelectedIds([]); setDeleteSheetOpen(false); }}
           onCopy={async () => {
@@ -700,6 +728,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           }}
           onEdit={handleEditStart}
           onPinToggle={handlePinToggle}
+          onReply={handleReplyStart}
           onDelete={() => setDeleteSheetOpen(true)}
         />
       ) : (
@@ -747,9 +776,15 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       </AnimatePresence>
 
       <div
-        className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 space-y-2"
+        className={`flex-1 px-4 py-4 space-y-2 scrollbar-hide ${
+          // Block 5 — selection mode locks the scroll viewport so the CAB
+          // stays anchored and accidental drags don't drop the selection.
+          selectedIds.length > 0 ? "overflow-hidden touch-none" : "overflow-y-auto"
+        }`}
         onClick={() => {
           // Click-away dismissal: tapping the chat background closes the emoji picker.
+          // Disabled while in selection mode so taps can toggle bubbles instead.
+          if (selectedIds.length > 0) return;
           if (showEmoji) setShowEmoji(false);
           if (showAttach) setShowAttach(false);
         }}
@@ -774,16 +809,67 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
             <motion.div
               layout
               ref={(node) => { messageRefs.current[msg.id] = node; }}
-              onContextMenu={(e) => { e.preventDefault(); setSelectedIds((prev) => prev.includes(msg.id) ? prev.filter((id) => id !== msg.id) : [...prev, msg.id]); }}
-              onPointerDown={(e) => {
-                const timer = window.setTimeout(() => {
-                  setSelectedIds((prev) => prev.includes(msg.id) ? prev : [...prev, msg.id]);
-                }, 420);
-                const clear = () => window.clearTimeout(timer);
-                (e.currentTarget as HTMLDivElement).onpointerup = clear;
-                (e.currentTarget as HTMLDivElement).onpointerleave = clear;
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setSelectedIds((prev) =>
+                  prev.includes(msg.id) ? prev.filter((id) => id !== msg.id) : [...prev, msg.id],
+                );
               }}
-              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border flex flex-col ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""} ${eff.isTombstone ? "opacity-70 italic" : ""}`}
+              onPointerDown={(e) => {
+                // Tap-to-toggle while a selection is already active.
+                if (selectedIds.length > 0) return;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const target = e.currentTarget as HTMLDivElement & {
+                  __trivoLPTimer?: number;
+                  __trivoLPMove?: (ev: PointerEvent) => void;
+                  __trivoLPEnd?: () => void;
+                };
+                // Clear any leftover handlers from a previous gesture.
+                if (target.__trivoLPTimer) window.clearTimeout(target.__trivoLPTimer);
+                const cleanup = () => {
+                  if (target.__trivoLPTimer) {
+                    window.clearTimeout(target.__trivoLPTimer);
+                    target.__trivoLPTimer = undefined;
+                  }
+                  if (target.__trivoLPMove) {
+                    target.removeEventListener("pointermove", target.__trivoLPMove);
+                    target.__trivoLPMove = undefined;
+                  }
+                  if (target.__trivoLPEnd) {
+                    target.removeEventListener("pointerup", target.__trivoLPEnd);
+                    target.removeEventListener("pointercancel", target.__trivoLPEnd);
+                    target.removeEventListener("pointerleave", target.__trivoLPEnd);
+                    target.__trivoLPEnd = undefined;
+                  }
+                };
+                const onMove = (ev: PointerEvent) => {
+                  // Cancel long-press if the finger drifts more than 10px (scroll intent).
+                  if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 10) cleanup();
+                };
+                target.__trivoLPMove = onMove;
+                target.__trivoLPEnd = cleanup;
+                target.addEventListener("pointermove", onMove);
+                target.addEventListener("pointerup", cleanup);
+                target.addEventListener("pointercancel", cleanup);
+                target.addEventListener("pointerleave", cleanup);
+                target.__trivoLPTimer = window.setTimeout(() => {
+                  target.__trivoLPTimer = undefined;
+                  // Haptic-ish: lock selection in. Detach move listener so the
+                  // bubble stays selected even if the user keeps moving.
+                  cleanup();
+                  setSelectedIds((prev) => (prev.includes(msg.id) ? prev : [...prev, msg.id]));
+                }, 380);
+              }}
+              onClick={(e) => {
+                // While in selection mode, a normal tap toggles the bubble.
+                if (selectedIds.length === 0) return;
+                e.stopPropagation();
+                setSelectedIds((prev) =>
+                  prev.includes(msg.id) ? prev.filter((id) => id !== msg.id) : [...prev, msg.id],
+                );
+              }}
+              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border flex flex-col transition-colors ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring bg-primary/20 border-primary/40" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""} ${eff.isTombstone ? "opacity-70 italic" : ""}`}
             >
               {msg.media && !eff.isTombstone && renderMediaBubble(msg)}
               {eff.text && <p className="text-sm leading-relaxed break-words">{eff.text}</p>}
@@ -840,6 +926,35 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {replyTo && !editingId && (
+          <motion.div
+            key="reply-banner"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.15 }}
+            className="glass-panel rounded-none border-x-0 border-b-0 px-3 py-2 flex items-center gap-2 shrink-0"
+          >
+            <CornerUpLeft size={14} className="text-primary" />
+            <div className="flex-1 min-w-0 border-l-2 border-primary/60 pl-2">
+              <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">
+                {replyTo.sent ? "You" : name}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">{replyTo.preview}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyTo(null)}
+              className="p-1.5 rounded-md hover:bg-secondary/50 text-muted-foreground"
+              aria-label="Cancel reply"
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <MessageInput
         value={input}
         onValueChange={setInput}
@@ -857,7 +972,25 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       />
 
       <AnimatePresence>
-        {showEmoji && <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden"><EmojiPicker onEmojiClick={(e) => setInput(prev => prev + e.emoji)} width="100%" height={300} theme={theme as any} /></motion.div>}
+        {showEmoji && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: "auto" }}
+            exit={{ height: 0 }}
+            className="overflow-hidden trivo-emoji-picker"
+          >
+            <EmojiPicker
+              onEmojiClick={(e) => setInput((prev) => prev + e.emoji)}
+              width="100%"
+              height={320}
+              theme={theme as any}
+              searchDisabled
+              skinTonesDisabled
+              previewConfig={{ showPreview: false }}
+              lazyLoadEmojis
+            />
+          </motion.div>
+        )}
       </AnimatePresence>
       
       <ReportMenu userId={chatId} open={showReport} onClose={() => setShowReport(false)} />
