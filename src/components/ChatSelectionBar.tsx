@@ -59,6 +59,12 @@ const ChatSelectionBar = ({
         naturally to the right thanks to the flex-1 spacer above.
       */}
 
+      {allowReply && onReply && (
+        <button onClick={onReply} className={iconButton} aria-label="Reply to message">
+          <CornerUpLeft size={18} />
+        </button>
+      )}
+
       {allowEdit && onEdit && (
         <button onClick={onEdit} className={iconButton} aria-label="Edit message">
           <Pencil size={18} />
