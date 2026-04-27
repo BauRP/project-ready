@@ -141,7 +141,8 @@ export type TranslationKey =
   | "recordingHold"
   | "recordingRelease"
   | "recordingCancel"
-  | "micPermissionDenied";
+  | "micPermissionDenied"
+  | "uploadCancelled";
 
 type TranslationMap = Partial<Record<TranslationKey, string>>;
 
