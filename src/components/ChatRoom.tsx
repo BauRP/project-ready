@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Check, CheckCheck, Phone, Video, Flag, Download, Clock, ShieldAlert, Search, Pin, X } from "lucide-react";
+import { ArrowLeft, FileText, Check, CheckCheck, Phone, Video, Flag, Download, Clock, ShieldAlert, Search, Pin, X, CornerUpLeft } from "lucide-react";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
