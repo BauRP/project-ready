@@ -31,6 +31,7 @@ const ChatSelectionBar = ({
   allowEdit,
   allowPin,
   isPinned,
+  allowReply,
   allowDelete,
   onClose,
   onCopy,
@@ -38,6 +39,7 @@ const ChatSelectionBar = ({
   onShare,
   onEdit,
   onPinToggle,
+  onReply,
   onDelete,
 }: ChatSelectionBarProps) => {
   return (
