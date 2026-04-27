@@ -129,10 +129,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   }, [showEmoji, showAttach, showReport, forwardSheetOpen, deleteSheetOpen, callType, searchOpen, editingId, selectedIds.length, replyTo]);
 
   useBackNavigation(anyOverlayOpen, handleBack);
+  // Block 2 — Translate is universal: every message (incoming AND outgoing)
+  // gets a translation pass so the user can verify what the other side reads
+  // and reread their own thoughts in the configured target language.
   const syncIncomingTranslations = async (items: Message[]) => {
     const translated = await Promise.all(
       items.map(async (message) => {
-        if (message.sent || !message.text.trim() || isExpired(message.deleteAt)) {
+        if (!message.text.trim() || isExpired(message.deleteAt)) {
           return { ...message, translatedText: null };
         }
 
@@ -143,6 +146,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
 
     setMessages((prev) => prev.map((message) => translated.find((item) => item.id === message.id) || message));
   };
+
 
   // Firestore lifecycle (edit / delete / pin) — source of truth
   useEffect(() => {
