@@ -926,6 +926,35 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {replyTo && !editingId && (
+          <motion.div
+            key="reply-banner"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.15 }}
+            className="glass-panel rounded-none border-x-0 border-b-0 px-3 py-2 flex items-center gap-2 shrink-0"
+          >
+            <CornerUpLeft size={14} className="text-primary" />
+            <div className="flex-1 min-w-0 border-l-2 border-primary/60 pl-2">
+              <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">
+                {replyTo.sent ? t("you") || "You" : name}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">{replyTo.preview}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyTo(null)}
+              className="p-1.5 rounded-md hover:bg-secondary/50 text-muted-foreground"
+              aria-label="Cancel reply"
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <MessageInput
         value={input}
         onValueChange={setInput}
