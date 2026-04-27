@@ -213,14 +213,13 @@
     top: var(--app-top-offset);
     transition: top 0.2s ease-in-out;
   }
-  /* Edge-to-edge ad container reset — kills any inherited max-width / padding.
-     Hard-clipped overflow + contain layout prevents the SDK from triggering reflows
-     in the parent app shell when the CAB header swaps in. */
+  /* Block 4: Strict 320x50 standard banner. The container width is set
+     inline (320px) — the !important reset is removed so the ad doesn't
+     stretch full-bleed and so it can't overlap or capture taps for the
+     header buttons positioned beside it. */
   .ad-banner-container {
-    max-width: none !important;
-    width: 100vw !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
     overflow: hidden !important;
