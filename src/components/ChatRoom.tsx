@@ -578,10 +578,10 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     } catch (err) {
       if (!uploadCancelledRef.current) {
         console.error("[ChatRoom] file upload failed", err);
-      toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
+        toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
+      }
     } finally {
-      uploadingToast.dismiss?.();
-      setUploading(false);
+      endUpload();
     }
   };
 
