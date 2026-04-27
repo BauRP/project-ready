@@ -698,6 +698,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           allowEdit={allowEdit}
           allowPin={allowPin}
           isPinned={isPinnedSel}
+          allowReply={allowReply}
           allowDelete={allowDelete}
           onClose={() => { setSelectedIds([]); setDeleteSheetOpen(false); }}
           onCopy={async () => {
