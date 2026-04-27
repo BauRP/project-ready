@@ -766,9 +766,15 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       </AnimatePresence>
 
       <div
-        className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 space-y-2"
+        className={`flex-1 px-4 py-4 space-y-2 scrollbar-hide ${
+          // Block 5 — selection mode locks the scroll viewport so the CAB
+          // stays anchored and accidental drags don't drop the selection.
+          selectedIds.length > 0 ? "overflow-hidden touch-none" : "overflow-y-auto"
+        }`}
         onClick={() => {
           // Click-away dismissal: tapping the chat background closes the emoji picker.
+          // Disabled while in selection mode so taps can toggle bubbles instead.
+          if (selectedIds.length > 0) return;
           if (showEmoji) setShowEmoji(false);
           if (showAttach) setShowAttach(false);
         }}
