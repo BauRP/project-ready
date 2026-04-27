@@ -109,7 +109,8 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     searchOpen ||
     callType !== null ||
     selectedIds.length > 0 ||
-    editingId !== null;
+    editingId !== null ||
+    replyTo !== null;
 
   const handleBack = useCallback(() => {
     if (showEmoji) { setShowEmoji(false); return true; }
@@ -120,9 +121,12 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     if (callType !== null) { setCallType(null); return true; }
     if (searchOpen) { setSearchOpen(false); setSearchQuery(""); return true; }
     if (editingId) { setEditingId(null); return true; }
+    // CAB / selection has priority over reply-quote so the user can dismiss
+    // the contextual bar without losing their pending reply draft.
     if (selectedIds.length > 0) { setSelectedIds([]); return true; }
+    if (replyTo) { setReplyTo(null); return true; }
     return false;
-  }, [showEmoji, showAttach, showReport, forwardSheetOpen, deleteSheetOpen, callType, searchOpen, editingId, selectedIds.length]);
+  }, [showEmoji, showAttach, showReport, forwardSheetOpen, deleteSheetOpen, callType, searchOpen, editingId, selectedIds.length, replyTo]);
 
   useBackNavigation(anyOverlayOpen, handleBack);
   const syncIncomingTranslations = async (items: Message[]) => {
