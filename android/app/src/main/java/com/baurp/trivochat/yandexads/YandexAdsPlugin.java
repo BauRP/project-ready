@@ -66,13 +66,9 @@ public class YandexAdsPlugin extends Plugin {
                 bannerAdView = new BannerAdView(getContext());
                 bannerAdView.setAdUnitId(adUnitId);
 
-                // --- Edge-to-edge sticky banner (full screen width, system-style 50dp height) ---
-                int adWidthPx = getContext().getResources().getDisplayMetrics().widthPixels;
-                float density = getContext().getResources().getDisplayMetrics().density;
-                int adWidthDp = Math.round(adWidthPx / density);
-
-                // stickySize gives a Google-style adaptive banner that spans the full width
-                bannerAdView.setAdSize(BannerAdSize.stickySize(getContext(), adWidthDp));
+                // Block 4: STRICT 320x50 standard banner. Avoids the adaptive
+                // sticky size pulling the container taller than the header.
+                bannerAdView.setAdSize(BannerAdSize.fixedSize(getContext(), 320, 50));
                 // -------------------------------------------------------------------------------
 
                 bannerAdView.setBannerAdEventListener(new BannerAdEventListener() {
