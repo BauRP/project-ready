@@ -77,6 +77,11 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Block 3 — Track current upload meta + a cancel hook so the overlay's "X"
+  // can abort a hung Firebase upload (or at least dismiss the UI immediately).
+  const [uploadFileName, setUploadFileName] = useState<string | null>(null);
+  const uploadCancelRef = useRef<(() => void) | null>(null);
+  const uploadCancelledRef = useRef(false);
   const [peerStatus, setPeerStatus] = useState<"online" | "away" | "offline">("offline");
   const [scanOverlay, setScanOverlay] = useState(false);
   const [pendingDownload, setPendingDownload] = useState<string | null>(null);
