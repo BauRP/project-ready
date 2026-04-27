@@ -939,7 +939,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
             <CornerUpLeft size={14} className="text-primary" />
             <div className="flex-1 min-w-0 border-l-2 border-primary/60 pl-2">
               <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">
-                {replyTo.sent ? t("you") || "You" : name}
+                {replyTo.sent ? "You" : name}
               </p>
               <p className="text-xs text-muted-foreground truncate">{replyTo.preview}</p>
             </div>
