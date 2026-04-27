@@ -1,4 +1,4 @@
-name: Android BuilD (APK & AAB)
+name: Android Build (APK & AAB)
 
 on:
   push:
