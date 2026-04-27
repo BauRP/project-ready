@@ -43,6 +43,7 @@ import TranslationPlate from "./TranslationPlate";
 import AttachmentMenu from "./AttachmentMenu";
 import PinnedHeader from "./PinnedHeader";
 import DeleteMessageSheet from "./DeleteMessageSheet";
+import UploadOverlay from "./UploadOverlay";
 import { getChatPreferences, getDeleteAt, isExpired } from "@/lib/chat-preferences";
 import { notifyIncomingMessage, translateIncomingMessage } from "@/lib/notifications";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
@@ -77,6 +78,11 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Block 3 — Track current upload meta + a cancel hook so the overlay's "X"
+  // can abort a hung Firebase upload (or at least dismiss the UI immediately).
+  const [uploadFileName, setUploadFileName] = useState<string | null>(null);
+  const uploadCancelRef = useRef<(() => void) | null>(null);
+  const uploadCancelledRef = useRef(false);
   const [peerStatus, setPeerStatus] = useState<"online" | "away" | "offline">("offline");
   const [scanOverlay, setScanOverlay] = useState(false);
   const [pendingDownload, setPendingDownload] = useState<string | null>(null);
@@ -129,10 +135,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   }, [showEmoji, showAttach, showReport, forwardSheetOpen, deleteSheetOpen, callType, searchOpen, editingId, selectedIds.length, replyTo]);
 
   useBackNavigation(anyOverlayOpen, handleBack);
+  // Block 2 — Translate is universal: every message (incoming AND outgoing)
+  // gets a translation pass so the user can verify what the other side reads
+  // and reread their own thoughts in the configured target language.
   const syncIncomingTranslations = async (items: Message[]) => {
     const translated = await Promise.all(
       items.map(async (message) => {
-        if (message.sent || !message.text.trim() || isExpired(message.deleteAt)) {
+        if (!message.text.trim() || isExpired(message.deleteAt)) {
           return { ...message, translatedText: null };
         }
 
@@ -143,6 +152,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
 
     setMessages((prev) => prev.map((message) => translated.find((item) => item.id === message.id) || message));
   };
+
 
   // Firestore lifecycle (edit / delete / pin) — source of truth
   useEffect(() => {
@@ -388,7 +398,14 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       ...prev,
       { id: msg.id, text: currentInput, sent: true, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), status: "pending", deleteAt: msg.deleteAt },
     ]);
-    
+
+    // Block 2 — Translate own outgoing text so the user can re-read their
+    // message in the configured target language (mirrors incoming behaviour).
+    void translateIncomingMessage(currentInput).then((translatedText) => {
+      if (!translatedText) return;
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, translatedText } : m)));
+    });
+
     setInput("");
     setReplyTo(null);
     setShowEmoji(false);
@@ -438,15 +455,35 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     }
   };
 
+  // Block 3 — single source of truth for the upload overlay. Strict success
+  // / error / cancel paths so the banner never gets stuck.
+  const beginUpload = (fileName: string) => {
+    uploadCancelledRef.current = false;
+    uploadCancelRef.current = null;
+    setUploadFileName(fileName);
+    setUploading(true);
+  };
+  const endUpload = () => {
+    uploadCancelRef.current = null;
+    setUploadFileName(null);
+    setUploading(false);
+  };
+  const handleCancelUpload = () => {
+    uploadCancelledRef.current = true;
+    try { uploadCancelRef.current?.(); } catch { /* ignore */ }
+    endUpload();
+    toast({ title: t("uploadCancelled") || "Upload cancelled" });
+  };
+
   // Voice messages bypass EXIF scrub (audio has no EXIF) and the malware scan
   // (internal recording, not user-supplied). They flow through uploadMedia →
   // sendP2PMessage → bufferMessageInCloud just like any other audio attachment.
   const handleVoiceRecorded = async (file: File) => {
     if (!userId) return;
-    setUploading(true);
-    const uploadingToast = toast({ title: t("uploading") || "Uploading…" });
+    beginUpload(file.name);
     try {
       const media = await uploadMedia(file);
+      if (uploadCancelledRef.current) return;
       const msgId = generateUUIDv4();
       const msg: P2PMessage & { media: MediaAttachment } = {
         id: msgId,
@@ -462,6 +499,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       const sent = await sendP2PMessage(peerId, msg as any);
       if (!sent) await bufferMessageInCloud(chatId, msg as any);
 
+      // Immediate UI refresh — bubble appears the instant the URL is back.
       setMessages((prev) => [
         ...prev,
         {
@@ -474,11 +512,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           deleteAt: msg.deleteAt,
         },
       ]);
-    } catch {
-      toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
+    } catch (err) {
+      if (!uploadCancelledRef.current) {
+        console.error("[ChatRoom] voice upload failed", err);
+        toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
+      }
     } finally {
-      uploadingToast.dismiss?.();
-      setUploading(false);
+      endUpload();
     }
   };
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -493,18 +533,18 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       return;
     }
 
-    setUploading(true);
-    const uploadingToast = toast({ title: t("uploading") || "Uploading…" });
+    beginUpload(file.name);
     try {
       file = await stripExifMetadata(file);
       const scanResult = simulateSecurityScan(file.name, false);
       if (!scanResult.safe) {
         toast({ title: getBlockedFileMessage(language, file.type.startsWith("image") ? "photo" : "file").footer, variant: "destructive" });
-        setUploading(false);
+        endUpload();
         return;
       }
 
       const media = await uploadMedia(file);
+      if (uploadCancelledRef.current) return;
       const msgId = generateUUIDv4();
       const msg: P2PMessage & { media: MediaAttachment } = {
         id: msgId,
@@ -535,11 +575,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           deleteAt: msg.deleteAt,
         },
       ]);
-    } catch {
-      toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
+    } catch (err) {
+      if (!uploadCancelledRef.current) {
+        console.error("[ChatRoom] file upload failed", err);
+        toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
+      }
     } finally {
-      uploadingToast.dismiss?.();
-      setUploading(false);
+      endUpload();
     }
   };
 
@@ -874,7 +916,9 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
               {msg.media && !eff.isTombstone && renderMediaBubble(msg)}
               {eff.text && <p className="text-sm leading-relaxed break-words">{eff.text}</p>}
               {msg.caption && !eff.isTombstone && <p className="text-sm leading-relaxed break-words mt-2">{msg.caption}</p>}
-              {msg.translatedText && !msg.sent && !eff.isTombstone && (
+              {/* Block 2 — Universal translation: render the plate for ANY
+                  message (sent or received) once a translation exists. */}
+              {msg.translatedText && !eff.isTombstone && (
                 <TranslationPlate translatedText={msg.translatedText} sent={msg.sent} />
               )}
               <div className={`flex items-center gap-1 justify-end mt-1 ${msg.sent ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
@@ -963,6 +1007,15 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         onToggleAttach={() => { setShowAttach(!showAttach); setShowEmoji(false); }}
         onVoiceRecorded={handleVoiceRecorded}
         placeholder={t("typeMessage")}
+        overlaySlot={
+          <UploadOverlay
+            visible={uploading}
+            fileName={uploadFileName ?? undefined}
+            label={t("uploading") || "Uploading…"}
+            cancelLabel={t("uploadCancelled") || "Cancel upload"}
+            onCancel={handleCancelUpload}
+          />
+        }
       />
 
       <AttachmentMenu

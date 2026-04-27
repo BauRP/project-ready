@@ -141,7 +141,8 @@ export type TranslationKey =
   | "recordingHold"
   | "recordingRelease"
   | "recordingCancel"
-  | "micPermissionDenied";
+  | "micPermissionDenied"
+  | "uploadCancelled";
 
 type TranslationMap = Partial<Record<TranslationKey, string>>;
 
@@ -271,6 +272,7 @@ const en: TranslationMap = {
   recordingRelease: "Release to send",
   recordingCancel: "Slide up to cancel",
   micPermissionDenied: "Microphone permission denied",
+  uploadCancelled: "Upload cancelled",
   disappearingMessages: "Disappearing Messages",
   translationSettings: "Translation Settings",
   edit: "Edit",
@@ -419,6 +421,7 @@ const ru: TranslationMap = {
   recordingRelease: "Отпустите, чтобы отправить",
   recordingCancel: "Сдвиньте вверх для отмены",
   micPermissionDenied: "Доступ к микрофону запрещён",
+  uploadCancelled: "Загрузка отменена",
   edit: "Изменить",
   edited: "изменено",
   editMessage: "Редактировать сообщение",

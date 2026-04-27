@@ -190,13 +190,13 @@ const AdMobBanner = () => {
   if (!isVisible) return null;
 
   return (
-    // Block 4 — Standard 320x50 banner, centered. z-index dropped to 10 so
-    // the chat Header (Back/Call/Avatar buttons) always wins pointer events
-    // and never gets eclipsed by the ad container.
+    // Block 4 — Standard 320x50 banner, centered, pushed BELOW the Android
+    // status bar via env(safe-area-inset-top). z-index dropped to 10 so the
+    // chat Header always wins pointer events.
     <div
-      className="fixed top-0 left-1/2 -translate-x-1/2 m-0 p-0 ad-banner-container shrink-0 bg-background flex items-center justify-center"
+      className="fixed left-1/2 -translate-x-1/2 m-0 p-0 ad-banner-container shrink-0 bg-background flex items-center justify-center"
       style={{
-        top: AD_CONFIG.TOP_OFFSET,
+        top: `calc(env(safe-area-inset-top, 0px) + ${AD_CONFIG.TOP_OFFSET}px)`,
         width: `${AD_CONFIG.BANNER_WIDTH}px`,
         height: `${BANNER_HEIGHT}px`,
         maxWidth: "100vw",
