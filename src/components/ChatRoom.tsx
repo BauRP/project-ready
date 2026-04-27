@@ -392,7 +392,14 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       ...prev,
       { id: msg.id, text: currentInput, sent: true, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), status: "pending", deleteAt: msg.deleteAt },
     ]);
-    
+
+    // Block 2 — Translate own outgoing text so the user can re-read their
+    // message in the configured target language (mirrors incoming behaviour).
+    void translateIncomingMessage(currentInput).then((translatedText) => {
+      if (!translatedText) return;
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, translatedText } : m)));
+    });
+
     setInput("");
     setReplyTo(null);
     setShowEmoji(false);
