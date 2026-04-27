@@ -799,16 +799,67 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
             <motion.div
               layout
               ref={(node) => { messageRefs.current[msg.id] = node; }}
-              onContextMenu={(e) => { e.preventDefault(); setSelectedIds((prev) => prev.includes(msg.id) ? prev.filter((id) => id !== msg.id) : [...prev, msg.id]); }}
-              onPointerDown={(e) => {
-                const timer = window.setTimeout(() => {
-                  setSelectedIds((prev) => prev.includes(msg.id) ? prev : [...prev, msg.id]);
-                }, 420);
-                const clear = () => window.clearTimeout(timer);
-                (e.currentTarget as HTMLDivElement).onpointerup = clear;
-                (e.currentTarget as HTMLDivElement).onpointerleave = clear;
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setSelectedIds((prev) =>
+                  prev.includes(msg.id) ? prev.filter((id) => id !== msg.id) : [...prev, msg.id],
+                );
               }}
-              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border flex flex-col ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""} ${eff.isTombstone ? "opacity-70 italic" : ""}`}
+              onPointerDown={(e) => {
+                // Tap-to-toggle while a selection is already active.
+                if (selectedIds.length > 0) return;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const target = e.currentTarget as HTMLDivElement & {
+                  __trivoLPTimer?: number;
+                  __trivoLPMove?: (ev: PointerEvent) => void;
+                  __trivoLPEnd?: () => void;
+                };
+                // Clear any leftover handlers from a previous gesture.
+                if (target.__trivoLPTimer) window.clearTimeout(target.__trivoLPTimer);
+                const cleanup = () => {
+                  if (target.__trivoLPTimer) {
+                    window.clearTimeout(target.__trivoLPTimer);
+                    target.__trivoLPTimer = undefined;
+                  }
+                  if (target.__trivoLPMove) {
+                    target.removeEventListener("pointermove", target.__trivoLPMove);
+                    target.__trivoLPMove = undefined;
+                  }
+                  if (target.__trivoLPEnd) {
+                    target.removeEventListener("pointerup", target.__trivoLPEnd);
+                    target.removeEventListener("pointercancel", target.__trivoLPEnd);
+                    target.removeEventListener("pointerleave", target.__trivoLPEnd);
+                    target.__trivoLPEnd = undefined;
+                  }
+                };
+                const onMove = (ev: PointerEvent) => {
+                  // Cancel long-press if the finger drifts more than 10px (scroll intent).
+                  if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 10) cleanup();
+                };
+                target.__trivoLPMove = onMove;
+                target.__trivoLPEnd = cleanup;
+                target.addEventListener("pointermove", onMove);
+                target.addEventListener("pointerup", cleanup);
+                target.addEventListener("pointercancel", cleanup);
+                target.addEventListener("pointerleave", cleanup);
+                target.__trivoLPTimer = window.setTimeout(() => {
+                  target.__trivoLPTimer = undefined;
+                  // Haptic-ish: lock selection in. Detach move listener so the
+                  // bubble stays selected even if the user keeps moving.
+                  cleanup();
+                  setSelectedIds((prev) => (prev.includes(msg.id) ? prev : [...prev, msg.id]));
+                }, 380);
+              }}
+              onClick={(e) => {
+                // While in selection mode, a normal tap toggles the bubble.
+                if (selectedIds.length === 0) return;
+                e.stopPropagation();
+                setSelectedIds((prev) =>
+                  prev.includes(msg.id) ? prev.filter((id) => id !== msg.id) : [...prev, msg.id],
+                );
+              }}
+              className={`max-w-[75%] px-3.5 py-2 rounded-2xl border flex flex-col transition-colors ${msg.sent ? "bg-primary text-primary-foreground rounded-br-md border-primary/20" : "glass-panel-sm rounded-bl-md border-border/30"} ${isSelected ? "ring-2 ring-ring bg-primary/20 border-primary/40" : ""} ${isActiveMatch ? "ring-2 ring-primary" : isMatch ? "ring-1 ring-border" : ""} ${eff.isTombstone ? "opacity-70 italic" : ""}`}
             >
               {msg.media && !eff.isTombstone && renderMediaBubble(msg)}
               {eff.text && <p className="text-sm leading-relaxed break-words">{eff.text}</p>}
