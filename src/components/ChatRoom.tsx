@@ -878,7 +878,9 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
               {msg.media && !eff.isTombstone && renderMediaBubble(msg)}
               {eff.text && <p className="text-sm leading-relaxed break-words">{eff.text}</p>}
               {msg.caption && !eff.isTombstone && <p className="text-sm leading-relaxed break-words mt-2">{msg.caption}</p>}
-              {msg.translatedText && !msg.sent && !eff.isTombstone && (
+              {/* Block 2 — Universal translation: render the plate for ANY
+                  message (sent or received) once a translation exists. */}
+              {msg.translatedText && !eff.isTombstone && (
                 <TranslationPlate translatedText={msg.translatedText} sent={msg.sent} />
               )}
               <div className={`flex items-center gap-1 justify-end mt-1 ${msg.sent ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
