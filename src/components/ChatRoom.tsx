@@ -718,6 +718,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           }}
           onEdit={handleEditStart}
           onPinToggle={handlePinToggle}
+          onReply={handleReplyStart}
           onDelete={() => setDeleteSheetOpen(true)}
         />
       ) : (
