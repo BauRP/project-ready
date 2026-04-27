@@ -560,6 +560,18 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   // Inside the bottom sheet, "Delete for everyone" is offered whenever the
   // user owns the selection — i.e. always when allowDelete is true.
   const canDeleteForEveryone = allowDelete;
+  // Reply only when exactly one non-tombstone message is selected.
+  const allowReply = !!singleSel && !singleSelIsTombstone;
+
+  const handleReplyStart = () => {
+    if (!singleSel) return;
+    const eff = getEffectiveText(singleSel);
+    const preview = eff.text || singleSel.media?.name || (singleSel.media ? "Media" : "Message");
+    setReplyTo({ id: singleSel.id, preview: preview.slice(0, 140), sent: singleSel.sent });
+    setSelectedIds([]);
+    setShowEmoji(false);
+    setShowAttach(false);
+  };
 
   const handleEditStart = () => {
     if (!singleSel) return;
