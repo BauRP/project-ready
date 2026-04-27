@@ -90,6 +90,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
   const [disappearingDuration, setDisappearingDuration] = useState<"1h" | "6h" | "12h" | "24h" | "off">("off");
   const [lifecycle, setLifecycle] = useState<Record<string, MessageLifecycle>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; preview: string; sent: boolean } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
