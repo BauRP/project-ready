@@ -455,15 +455,35 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     }
   };
 
+  // Block 3 — single source of truth for the upload overlay. Strict success
+  // / error / cancel paths so the banner never gets stuck.
+  const beginUpload = (fileName: string) => {
+    uploadCancelledRef.current = false;
+    uploadCancelRef.current = null;
+    setUploadFileName(fileName);
+    setUploading(true);
+  };
+  const endUpload = () => {
+    uploadCancelRef.current = null;
+    setUploadFileName(null);
+    setUploading(false);
+  };
+  const handleCancelUpload = () => {
+    uploadCancelledRef.current = true;
+    try { uploadCancelRef.current?.(); } catch { /* ignore */ }
+    endUpload();
+    toast({ title: t("uploadCancelled") || "Upload cancelled" });
+  };
+
   // Voice messages bypass EXIF scrub (audio has no EXIF) and the malware scan
   // (internal recording, not user-supplied). They flow through uploadMedia →
   // sendP2PMessage → bufferMessageInCloud just like any other audio attachment.
   const handleVoiceRecorded = async (file: File) => {
     if (!userId) return;
-    setUploading(true);
-    const uploadingToast = toast({ title: t("uploading") || "Uploading…" });
+    beginUpload(file.name);
     try {
       const media = await uploadMedia(file);
+      if (uploadCancelledRef.current) return;
       const msgId = generateUUIDv4();
       const msg: P2PMessage & { media: MediaAttachment } = {
         id: msgId,
@@ -479,6 +499,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       const sent = await sendP2PMessage(peerId, msg as any);
       if (!sent) await bufferMessageInCloud(chatId, msg as any);
 
+      // Immediate UI refresh — bubble appears the instant the URL is back.
       setMessages((prev) => [
         ...prev,
         {
@@ -491,11 +512,13 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           deleteAt: msg.deleteAt,
         },
       ]);
-    } catch {
-      toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
+    } catch (err) {
+      if (!uploadCancelledRef.current) {
+        console.error("[ChatRoom] voice upload failed", err);
+        toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
+      }
     } finally {
-      uploadingToast.dismiss?.();
-      setUploading(false);
+      endUpload();
     }
   };
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -510,18 +533,18 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       return;
     }
 
-    setUploading(true);
-    const uploadingToast = toast({ title: t("uploading") || "Uploading…" });
+    beginUpload(file.name);
     try {
       file = await stripExifMetadata(file);
       const scanResult = simulateSecurityScan(file.name, false);
       if (!scanResult.safe) {
         toast({ title: getBlockedFileMessage(language, file.type.startsWith("image") ? "photo" : "file").footer, variant: "destructive" });
-        setUploading(false);
+        endUpload();
         return;
       }
 
       const media = await uploadMedia(file);
+      if (uploadCancelledRef.current) return;
       const msgId = generateUUIDv4();
       const msg: P2PMessage & { media: MediaAttachment } = {
         id: msgId,
@@ -552,7 +575,9 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
           deleteAt: msg.deleteAt,
         },
       ]);
-    } catch {
+    } catch (err) {
+      if (!uploadCancelledRef.current) {
+        console.error("[ChatRoom] file upload failed", err);
       toast({ title: t("mediaUploadFailed") || "Upload failed", variant: "destructive" });
     } finally {
       uploadingToast.dismiss?.();
