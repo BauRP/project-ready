@@ -363,7 +363,16 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     }
 
     const msgId = generateUUIDv4();
-    const currentInput = input;
+    // Block 5: prepend the quoted reply preview to the outgoing text. Persists
+    // through P2P and Firebase as plain markdown-style quotation, so both ends
+    // see the threaded context without requiring a schema migration.
+    const quoted = replyTo
+      ? replyTo.preview
+          .split("\n")
+          .map((line) => `> ${line}`)
+          .join("\n") + "\n\n"
+      : "";
+    const currentInput = quoted + input;
     const msg: P2PMessage = {
       id: msgId,
       from: userId,
@@ -381,6 +390,7 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
     ]);
     
     setInput("");
+    setReplyTo(null);
     setShowEmoji(false);
     setSessionStarted(false);
 
