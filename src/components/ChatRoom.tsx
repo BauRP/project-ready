@@ -972,7 +972,25 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
       />
 
       <AnimatePresence>
-        {showEmoji && <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden"><EmojiPicker onEmojiClick={(e) => setInput(prev => prev + e.emoji)} width="100%" height={300} theme={theme as any} /></motion.div>}
+        {showEmoji && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: "auto" }}
+            exit={{ height: 0 }}
+            className="overflow-hidden trivo-emoji-picker"
+          >
+            <EmojiPicker
+              onEmojiClick={(e) => setInput((prev) => prev + e.emoji)}
+              width="100%"
+              height={320}
+              theme={theme as any}
+              searchDisabled
+              skinTonesDisabled
+              previewConfig={{ showPreview: false }}
+              lazyLoadEmojis
+            />
+          </motion.div>
+        )}
       </AnimatePresence>
       
       <ReportMenu userId={chatId} open={showReport} onClose={() => setShowReport(false)} />
