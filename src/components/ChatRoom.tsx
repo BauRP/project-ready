@@ -1007,6 +1007,15 @@ const ChatRoom = ({ chatId, name, emoji, onBack }: ChatRoomProps) => {
         onToggleAttach={() => { setShowAttach(!showAttach); setShowEmoji(false); }}
         onVoiceRecorded={handleVoiceRecorded}
         placeholder={t("typeMessage")}
+        overlaySlot={
+          <UploadOverlay
+            visible={uploading}
+            fileName={uploadFileName ?? undefined}
+            label={t("uploading") || "Uploading…"}
+            cancelLabel={t("uploadCancelled") || "Cancel upload"}
+            onCancel={handleCancelUpload}
+          />
+        }
       />
 
       <AttachmentMenu
